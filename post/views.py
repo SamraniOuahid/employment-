@@ -91,8 +91,8 @@ def view_pdf(request, pk):
     # Chemin du fichier PDF
     pdf_path = pdf_document.pdf_file.path
     
-    # Lire le fichier PDF
+    # Lire le fichier PDF cc
     with open(pdf_path, 'rb') as pdf:
-        response = HttpResponse(pdf.read(), content_type='application/pdf')
+        response = HttpResponse(pdf.read(), content_type='applic  ation/pdf')
         response['Content-Disposition'] = f'inline; filename="{os.path.basename(pdf_path)}"'
         return response
