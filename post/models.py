@@ -20,3 +20,14 @@ class PDFDocument(models.Model):
 
     def __str__(self):
         return self.title
+    
+
+class InterviewResponse(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    question = models.TextField()
+    answer = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Réponse de {self.user.username} pour {self.post.title}"

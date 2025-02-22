@@ -8,4 +8,4 @@ def extract_text_from_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             text += page.extract_text() or ""  # Gère les pages sans texte
-    return text.strip()
+    return text.strip()*10
