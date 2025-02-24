@@ -18,3 +18,13 @@ class PDFDocumentSerializer(serializers.ModelSerializer):
             if not value.name.endswith('.pdf'):
                 raise serializers.ValidationError("Seuls les fichiers PDF sont autorisés.")
             return value
+        
+
+
+
+class GenerateQuestionsSerializer(serializers.Serializer):
+    post_id = serializers.IntegerField(required=True)
+
+class EvaluateResponsesSerializer(serializers.Serializer):
+    post_id = serializers.IntegerField(required=True)
+    candidate_answers = serializers.ListField(child=serializers.CharField(), required=True)

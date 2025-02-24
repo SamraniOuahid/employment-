@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework import status
 from .models import Post, PDFDocument, InterviewResponse
-from .serializers import PostSerialzier, PDFDocumentSerializer
+from .serializers import PostSerialzier, PDFDocumentSerializer, GenerateQuestionsSerializer, EvaluateResponsesSerializer
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.http import HttpResponse
@@ -14,6 +14,7 @@ from .utils import extract_text_from_pdf
 from .ai_question_generator import generate_questions
 from django.conf import settings
 from .speech_to_text import transcribe_audio
+from .interview_system import generate_questions, evaluate_responses
 # Create your views here.
 # get All
 @api_view(['GET'])
@@ -217,3 +218,44 @@ class SubmitVoiceResponse(APIView):
         os.remove(temp_audio_path)
 
         return Response({"message": "Réponse vocale transmise avec succès.", "transcribed_text": transcribed_text})
+    
+class GenerateQuestionsAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = GenerateQuestionsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        post_id = serializer.validated_data['post_id']
+        try:
+            post = Post.objects.get(id=post_id)
+        except Post.DoesNotExist:
+            return Response({"error": "Le poste n'existe pas."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Générer des questions
+        questions = generate_questions(post.description, num_questions=5)
+
+        return Response({"questions": questions}, status=status.HTTP_200_OK)
+
+class EvaluateResponsesAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = EvaluateResponsesSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        post_id = serializer.validated_data['post_id']
+        candidate_answers = serializer.validated_data['candidate_answers']
+
+        try:
+            post = Post.objects.get(id=post_id)
+        except Post.DoesNotExist:
+            return Response({"error": "Le poste n'existe pas."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Évaluer les réponses
+        final_score, scores = evaluate_responses(candidate_answers, post.description)
+
+        return Response({
+            "final_score": final_score,
+            "scores": scores,
+            "post_title": post.title,
+            "post_description": post.description
+        }, status=status.HTTP_200_OK)

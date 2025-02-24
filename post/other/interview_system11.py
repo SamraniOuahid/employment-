@@ -1,4 +1,4 @@
-# post/interview_system.py
+# interview_system.py
 
 from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
@@ -49,3 +49,32 @@ def evaluate_responses(candidate_answers, post_description):
     # Calculer la note finale (moyenne des scores)
     final_score = round(total_score / len(candidate_answers), 2) if candidate_answers else 0
     return final_score, scores
+
+# Exemple d'utilisation
+if __name__ == "__main__":
+    # Description du poste
+    post_description = (
+        "Compétences requises : Connaissance approfondie de Django, y compris les vues, les modèles, les formulaires et les templates. "
+        "Expérience avec la création d'API REST en utilisant Django REST Framework. "
+        "Compréhension des bases de données relationnelles et des requêtes SQL."
+    )
+
+    # Générer des questions
+    questions = generate_questions(post_description, num_questions=3)
+    print("Questions générées :")
+    for i, question in enumerate(questions):
+        print(f"{i + 1}. {question}")
+
+    # Simuler les réponses du candidat
+    candidate_answers = [
+        "Un modèle en Django représente une table de base de données.",
+        "Pour créer une API REST, utilisez Django REST Framework avec des sérializers et des vues génériques.",
+        "Les requêtes SQL peuvent être optimisées en utilisant des index et des jointures efficaces."
+    ]
+
+    # Évaluer les réponses par rapport à la description du poste
+    final_score, scores = evaluate_responses(candidate_answers, post_description)
+    print("\nRésultats de l'évaluation :")
+    print(f"Note finale : {final_score}%")
+    for i, score in enumerate(scores):
+        print(f"Réponse {i + 1} : {score}%")
