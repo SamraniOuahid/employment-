@@ -15,6 +15,7 @@ from .ai_question_generator import generate_questions
 from django.conf import settings
 from .speech_to_text import transcribe_audio
 from .interview_system import generate_questions, evaluate_responses
+from .audio_utils import convert_audio_to_wav
 # Create your views here.
 # get All
 @api_view(['GET'])
@@ -220,12 +221,12 @@ class SubmitVoiceResponse(APIView):
         return Response({"message": "Réponse vocale transmise avec succès.", "transcribed_text": transcribed_text})
     
 class GenerateQuestionsAPIView(APIView):
+    """Génère des questions techniques pour un poste donné."""
     def post(self, request, *args, **kwargs):
-        serializer = GenerateQuestionsSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        post_id = request.data.get('post_id')
+        if not post_id:
+            return Response({"error": "post_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
 
-        post_id = serializer.validated_data['post_id']
         try:
             post = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
@@ -235,22 +236,48 @@ class GenerateQuestionsAPIView(APIView):
         questions = generate_questions(post.description, num_questions=5)
 
         return Response({"questions": questions}, status=status.HTTP_200_OK)
+    
 
-class EvaluateResponsesAPIView(APIView):
+class EvaluateAudioResponsesAPIView(APIView):
+    parser_classes = [MultiPartParser]
+
     def post(self, request, *args, **kwargs):
-        serializer = EvaluateResponsesSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        post_id = request.data.get('post_id')
+        audio_files = request.FILES.getlist('audio_files')
 
-        post_id = serializer.validated_data['post_id']
-        candidate_answers = serializer.validated_data['candidate_answers']
+        if not post_id:
+            return Response({"error": "post_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
+        if not audio_files:
+            return Response({"error": "Aucun fichier audio fourni."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             post = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
             return Response({"error": "Le poste n'existe pas."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Évaluer les réponses
+        # Transcrire chaque fichier audio en texte
+        candidate_answers = []
+        for i, audio_file in enumerate(audio_files):
+            temp_audio_path = f"temp_audio_{i}.wav"
+            with open(temp_audio_path, "wb+") as destination:
+                for chunk in audio_file.chunks():
+                    destination.write(chunk)
+
+            # Convertir le fichier audio si nécessaire
+            converted_audio_path = convert_audio_to_wav(temp_audio_path)
+
+            # Transcrire le fichier audio
+            try:
+                transcribed_text = transcribe_audio(converted_audio_path, language="fr-FR")
+                candidate_answers.append(transcribed_text)
+            except Exception as e:
+                return Response({"error": f"Erreur lors de la transcription du fichier {i + 1}: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Supprimer les fichiers temporaires
+            os.remove(temp_audio_path)
+            os.remove(converted_audio_path)
+
+        # Évaluer les réponses transcriptions
         final_score, scores = evaluate_responses(candidate_answers, post.description)
 
         return Response({

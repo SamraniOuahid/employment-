@@ -20,6 +20,9 @@ def register(request):
                 email = data['email'],
                 username = data['email'],
                 password = make_password(data['password']) ,
+                role = data['role'],
+                verified = data['verified']
+                
                 
             )
             return Response({'details': 'your account register succes!'},
