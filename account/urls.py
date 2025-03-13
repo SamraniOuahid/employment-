@@ -1,8 +1,15 @@
+# accounts/urls.py
+
 from django.urls import path
-from . import views
+from .views import register, current_user, update_user
 
 urlpatterns = [
-    path('register/', views.register, name='register'),
-    path('userinfo/', views.current_user, name='userinfo'),
-    path('userinfo/update/', views.update_user, name='update_user')
+    # Inscription d'un nouvel utilisateur
+    path('register/', register, name='register'),
+
+    # Récupérer les détails de l'utilisateur connecté
+    path('current-user/', current_user, name='current_user'),
+
+    # Mettre à jour les détails de l'utilisateur connecté
+    path('update-user/', update_user, name='update_user'),
 ]
