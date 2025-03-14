@@ -1,8 +1,11 @@
+# post/models.py
+
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings  # Importez settings pour AUTH_USER_MODEL
 from django.core.exceptions import ValidationError
 import os
 from django.utils.timezone import now
+
 # Model representing a job post
 class Post(models.Model):
     """Represents a job post."""
@@ -10,7 +13,7 @@ class Post(models.Model):
     description = models.TextField(blank=False, help_text="Detailed description of the job post")
     final_date = models.DateField(blank=True, null=True, help_text="Application deadline for the job post")
     uploaded_at = models.DateTimeField(default=now, help_text="Date and time when the post was created")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, help_text="User who created the job post")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, help_text="User who created the job post")  # Utilisez AUTH_USER_MODEL
     accepted = models.BooleanField(default=False, help_text="Indicates if the candidate has been accepted")
 
     def __str__(self):
@@ -45,7 +48,7 @@ class PDFDocument(models.Model):
 # Model representing a response in an interview
 class InterviewResponse(models.Model):
     """Represents a candidate's response during an interview."""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, help_text="User who provided the response")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="User who provided the response")  # Utilisez AUTH_USER_MODEL
     post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Job post associated with the interview")
     question = models.TextField(help_text="Interview question asked to the candidate")
     answer = models.TextField(help_text="Candidate's response to the question")
@@ -76,7 +79,7 @@ class InterviewResponse(models.Model):
 # Model representing a report generated after an interview
 class Report(models.Model):
     """Represents a report generated after an interview."""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, help_text="User associated with the report")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="User associated with the report")  # Utilisez AUTH_USER_MODEL
     post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Job post associated with the report")
     date = models.DateField(auto_now_add=True, help_text="Date when the report was generated")
     message = models.TextField(blank=False, help_text="Content of the report")
@@ -90,7 +93,7 @@ class Report(models.Model):
         Generates a report based on the candidate's responses.
 
         Args:
-            user (User): The user (candidate) for whom the report is being generated.
+            user (CustomUser): The user (candidate) for whom the report is being generated.
             post (Post): The job post associated with the interview.
 
         Returns:
@@ -117,7 +120,7 @@ class Report(models.Model):
 # Model representing a notification
 class Notification(models.Model):
     """Represents a notification sent to a user."""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, help_text="User receiving the notification")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="User receiving the notification")  # Utilisez AUTH_USER_MODEL
     notification = models.TextField(help_text="Message of the notification")
     read = models.BooleanField(default=False, help_text="Indicates if the notification has been read")
     created_at = models.DateTimeField(auto_now_add=True, help_text="Date and time when the notification was created")
