@@ -1,11 +1,13 @@
-# utils.py
-
-import pdfplumber
+import PyPDF2
 
 def extract_text_from_pdf(pdf_path):
-    """Extrait le texte brut d'un fichier PDF."""
+    """Extrait le texte d'un fichier PDF."""
     text = ""
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            text += page.extract_text() or ""  # Gère les pages sans texte
-    return text.strip()*10
+    try:
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            for page in reader.pages:
+                text += page.extract_text() or ""
+    except Exception as e:
+        print(f"Erreur lors de l'extraction du texte du PDF : {e}")
+    return text

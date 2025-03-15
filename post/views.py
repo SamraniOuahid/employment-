@@ -1,172 +1,134 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from .models import Post, PDFDocument, InterviewResponse
-from .serializers import PostSerialzier, PDFDocumentSerializer, GenerateQuestionsSerializer, EvaluateResponsesSerializer
 from rest_framework.views import APIView
-from rest_framework.parsers import MultiPartParser, FormParser
-from django.http import HttpResponse
-import os
+from .models import Post, PDFDocument, InterviewResponse, Notification
+from .serializers import PostSerializer, PDFDocumentSerializer, EvaluateResponsesSerializer
 from .ai_algorithm import compare_cv_with_post
 from .utils import extract_text_from_pdf
-from .ai_question_generator import generate_questions
-from django.conf import settings
-from .speech_to_text import transcribe_audio
 from .interview_system import generate_questions, evaluate_responses
-from .audio_utils import convert_audio_to_wav
-# Create your views here.
-# get All
+
+# Get all posts
 @api_view(['GET'])
 def get_all_post(request):
-    post = Post.objects.all()
-    serializer = PostSerialzier(post, many=True)
-    print(post)
-    return Response({"post":serializer.data})
+    posts = Post.objects.all()
+    serializer = PostSerializer(posts, many=True)
+    return Response({"posts": serializer.data})
 
-#get post by id
+# Get post by ID
 @api_view(['GET'])
 def get_by_id(request, pk):
     post = get_object_or_404(Post, id=pk)
-    serializer = PostSerialzier(post, many=False)
-    print(post)
-    return Response({"posts":serializer.data})
+    serializer = PostSerializer(post, many=False)
+    return Response({"post": serializer.data})
 
+# Create a new post
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def new_Post(request):
+def new_post(request):
     data = request.data
-    serializer = PostSerialzier(data = data)
+    serializer = PostSerializer(data=data)
     if serializer.is_valid():
-        post = Post.objects.create(**data, user = request.user)
-        res = PostSerialzier(post, many=False)
-        return Response({"post":res.data})
-    else:
-        return Response(serializer.errors)
-    
-# update
+        post = Post.objects.create(**data, user=request.user)
+        res = PostSerializer(post, many=False)
+        return Response({"post": res.data})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# Update a post
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
-def update_post(request,pk):
-    post = get_object_or_404(Post,id=pk)
-
+def update_post(request, pk):
+    post = get_object_or_404(Post, id=pk)
     if post.user != request.user:
-        return Response({"error":"Sorry you can not update this post"}
-                        , status=status.HTTP_403_FORBIDDEN)
+        return Response({"error": "Sorry, you cannot update this post"}, status=status.HTTP_403_FORBIDDEN)
     
-    post.title = request.data['title']
-    post.description = request.data['description']
-    post.dateFin = request.data['dateFin']
+    post.title = request.data.get('title', post.title)
+    post.description = request.data.get('description', post.description)
+    post.final_date = request.data.get('final_date', post.final_date)
     post.save()
-    serializer = PostSerialzier(post,many=False)
-    return Response({"post":serializer.data})
+    serializer = PostSerializer(post, many=False)
+    return Response({"post": serializer.data})
 
-
+# Delete a post
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
-def delete_post(request,pk):
-    post = get_object_or_404(Post,id=pk)
-
+def delete_post(request, pk):
+    post = get_object_or_404(Post, id=pk)
     if post.user != request.user:
-        return Response({"error":"Sorry you can not update this post"}
-                        , status=status.HTTP_403_FORBIDDEN)
-    
-    
+        return Response({"error": "Sorry, you cannot delete this post"}, status=status.HTTP_403_FORBIDDEN)
     post.delete()
-    
-    return Response({"post":"The post is deleted"}, status=status.HTTP_200_OK)
+    return Response({"message": "The post is deleted"}, status=status.HTTP_200_OK)
 
-
-
+# Upload a PDF (e.g., CV)
 class PDFUploadView(APIView):
-    parser_classes = (MultiPartParser, FormParser)
-
     def post(self, request, *args, **kwargs):
         serializer = PDFDocumentSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
-    
-def view_pdf(request, pk):
-    # Récupérer le document PDF depuis le modèle PDFDocument
-    pdf_document = get_object_or_404(PDFDocument, id=pk)
-    
-    # Chemin du fichier PDF
-    pdf_path = pdf_document.pdf_file.path
-    
-    # Vérifier si le fichier existe
-    if not os.path.exists(pdf_path):
-        return HttpResponse("Fichier PDF introuvable", status=404)
-    
-    # Lire le fichier PDF
-    with open(pdf_path, 'rb') as pdf:
-        response = HttpResponse(pdf.read(), content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="{os.path.basename(pdf_path)}"'
-        return response
-    
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# Compare CV with Post
 class CompareCVWithPost(APIView):
     def post(self, request, *args, **kwargs):
         cv_id = request.data.get('cv_id')
         post_id = request.data.get('post_id')
-
         try:
             pdf_document = PDFDocument.objects.get(id=cv_id)
             post = Post.objects.get(id=post_id)
         except (PDFDocument.DoesNotExist, Post.DoesNotExist):
-            return Response({"error": "CV ou poste introuvable."}, status=404)
+            return Response({"error": "CV or post not found."}, status=status.HTTP_404_NOT_FOUND)
 
         cv_text = extract_text_from_pdf(pdf_document.pdf_file.path)
         similarity_score = compare_cv_with_post(cv_text, post.description)
 
-        if similarity_score > 0.5:  # Seuil de 50%
+        if similarity_score > 0.5:
             return Response({
-                "message": "Vous êtes éligible pour un entretien.",
+                "message": "You are eligible for an interview.",
                 "similarity_score": round(similarity_score * 100, 2),
                 "next_step": "interview"
             })
-        else:
-            return Response({
-                "message": "Désolé, vous n'êtes pas éligible pour un entretien.",
-                "similarity_score": round(similarity_score * 100, 2)
-            })
-        
+        return Response({
+            "message": "Sorry, you are not eligible for an interview.",
+            "similarity_score": round(similarity_score * 100, 2)
+        })
 
-
+# Generate interview questions
 class InterviewView(APIView):
     def post(self, request, *args, **kwargs):
         post_id = request.data.get('post_id')
-
         try:
             post = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
-            return Response({"error": "Poste introuvable."}, status=404)
+            return Response({"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Générer des questions
         questions = generate_questions(post.description, num_questions=5)
-
         return Response({
             "questions": questions,
             "post_title": post.title
         })
-    
 
+# Submit text responses for interview
 class SubmitInterviewResponse(APIView):
     def post(self, request, *args, **kwargs):
         post_id = request.data.get('post_id')
-        responses = request.data.get('responses')  # Liste de {question: ..., answer: ...}
+        responses = request.data.get('responses')  # Expected format: [{"question": "...", "answer": "..."}, ...]
 
         try:
             post = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
-            return Response({"error": "Poste introuvable."}, status=404)
+            return Response({"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not responses or not isinstance(responses, list):
+            return Response({"error": "Responses must be a list."}, status=status.HTTP_400_BAD_REQUEST)
 
         for response in responses:
             question = response.get('question')
             answer = response.get('answer')
+            if not question or not answer:
+                return Response({"error": "Each response must have a question and an answer."}, status=status.HTTP_400_BAD_REQUEST)
             InterviewResponse.objects.create(
                 user=request.user,
                 post=post,
@@ -174,115 +136,41 @@ class SubmitInterviewResponse(APIView):
                 answer=answer
             )
 
-        return Response({"message": "Réponses soumises avec succès."})
-    
+        return Response({"message": "Text responses submitted successfully."}, status=status.HTTP_200_OK)
 
-
-
-
-class SubmitVoiceResponse(APIView):
+# Evaluate text responses
+class EvaluateTextResponsesAPIView(APIView):
     def post(self, request, *args, **kwargs):
-        post_id = request.data.get('post_id')
-        audio_file = request.FILES.get('audio_file')  # Fichier audio soumis par l'utilisateur
-        question = request.data.get('question')
+        serializer = EvaluateResponsesSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        post_id = serializer.validated_data['post_id']
+        candidate_answers = serializer.validated_data['candidate_answers']
 
         try:
             post = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
-            return Response({"error": "Poste introuvable."}, status=404)
+            return Response({"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not audio_file:
-            return Response({"error": "Aucun fichier audio fourni."}, status=400)
-
-        # Sauvegarder temporairement le fichier audio
-        temp_audio_path = os.path.join(settings.MEDIA_ROOT, audio_file.name)
-        with open(temp_audio_path, 'wb+') as destination:
-            for chunk in audio_file.chunks():
-                destination.write(chunk)
-
-        # Transcrire le fichier audio
-        try:
-            transcribed_text = transcribe_audio(temp_audio_path)
-        except Exception as e:
-            os.remove(temp_audio_path)  # Nettoyer le fichier temporaire en cas d'erreur
-            return Response({"error": f"Erreur lors de la transcription : {str(e)}"}, status=500)
-
-        # Enregistrer la réponse dans la base de données
-        InterviewResponse.objects.create(
-            user=request.user,
-            post=post,
-            question=question,
-            answer=transcribed_text
-        )
-
-        # Supprimer le fichier temporaire après traitement
-        os.remove(temp_audio_path)
-
-        return Response({"message": "Réponse vocale transmise avec succès.", "transcribed_text": transcribed_text})
-    
-class GenerateQuestionsAPIView(APIView):
-    """Génère des questions techniques pour un poste donné."""
-    def post(self, request, *args, **kwargs):
-        post_id = request.data.get('post_id')
-        if not post_id:
-            return Response({"error": "post_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            post = Post.objects.get(id=post_id)
-        except Post.DoesNotExist:
-            return Response({"error": "Le poste n'existe pas."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Générer des questions
-        questions = generate_questions(post.description, num_questions=5)
-
-        return Response({"questions": questions}, status=status.HTTP_200_OK)
-    
-
-class EvaluateAudioResponsesAPIView(APIView):
-    parser_classes = [MultiPartParser]
-
-    def post(self, request, *args, **kwargs):
-        post_id = request.data.get('post_id')
-        audio_files = request.FILES.getlist('audio_files')
-
-        if not post_id:
-            return Response({"error": "post_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
-        if not audio_files:
-            return Response({"error": "Aucun fichier audio fourni."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            post = Post.objects.get(id=post_id)
-        except Post.DoesNotExist:
-            return Response({"error": "Le poste n'existe pas."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Transcrire chaque fichier audio en texte
-        candidate_answers = []
-        for i, audio_file in enumerate(audio_files):
-            temp_audio_path = f"temp_audio_{i}.wav"
-            with open(temp_audio_path, "wb+") as destination:
-                for chunk in audio_file.chunks():
-                    destination.write(chunk)
-
-            # Convertir le fichier audio si nécessaire
-            converted_audio_path = convert_audio_to_wav(temp_audio_path)
-
-            # Transcrire le fichier audio
-            try:
-                transcribed_text = transcribe_audio(converted_audio_path, language="fr-FR")
-                candidate_answers.append(transcribed_text)
-            except Exception as e:
-                return Response({"error": f"Erreur lors de la transcription du fichier {i + 1}: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            # Supprimer les fichiers temporaires
-            os.remove(temp_audio_path)
-            os.remove(converted_audio_path)
-
-        # Évaluer les réponses transcriptions
         final_score, scores = evaluate_responses(candidate_answers, post.description)
+
+        # Save scores to InterviewResponse (optional)
+        responses = InterviewResponse.objects.filter(user=request.user, post=post).order_by('timestamp')[:len(candidate_answers)]
+        for response, score in zip(responses, scores):
+            response.score = score
+            response.save()
+
+        # Create notification if score is sufficient
+        if final_score > 70:
+            Notification.objects.create(
+                user=request.user,
+                notification=f"Congratulations! You passed the virtual interview for {post.title}. Please attend an in-person interview."
+            )
 
         return Response({
             "final_score": final_score,
             "scores": scores,
             "post_title": post.title,
-            "post_description": post.description
+            "message": "Text response evaluation completed."
         }, status=status.HTTP_200_OK)
