@@ -365,4 +365,4 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
 - **Installation** :
   - Les étapes sont détaillées et incluent un exemple de `requirements.txt` pour faciliter l’installation.
 
-Cette version est prête à être utilisée dans votre dépôt. Si vous voulez ajouter des sections supplémentaires (comme une section "Contribution" ou "Licence"), ou modifier quelque chose, dites-le-moi ! Que pensez-vous de cette version finale ? Prêt à l’installer dans votre dépôt ?
+
