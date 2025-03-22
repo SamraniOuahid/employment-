@@ -330,8 +330,32 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
       "message": "Text response evaluation completed."
   }
   ```
-```
 
+#### 15. `GET /api/dashboard-stats/` - Statistiques du tableau de bord **[Auth]**
+- **Description** : Récupère les statistiques globales du projet (utilisateurs, posts, CVs, réponses d’entretien).
+- **Headers** : `Authorization: Bearer <token>`
+- **Réponse** :
+  ```json
+  {
+      "users": {
+          "total": 50,
+          "employees": 30,
+          "employers": 15,
+          "admins": 5,
+          "verified": 20
+      },
+      "posts": {
+          "total": 25,
+          "active": 18,
+          "accepted": 10
+      },
+      "cvs": {
+          "total": 40
+      },
+      "interview_responses": {
+          "total": 100
+      }
+  }
 ---
 
 ### Instructions pour l’ajouter à votre dépôt GitHub
