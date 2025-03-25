@@ -6,7 +6,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
+from django.db import models  # Ajoutez cette ligne pour Avg
 from .models import CustomUser
+from post.models import Post, PDFDocument, InterviewResponse, Notification
 from .serializers import SignUpSerializer, UserSerializer
 
 @api_view(['POST'])
@@ -64,3 +66,65 @@ def update_user(request):
     # Sérialiser et retourner les données mises à jour
     serializer = UserSerializer(user, many=False)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_stats(request):
+    """Récupérer les statistiques du tableau de bord."""
+    # Nombre total d'utilisateurs
+    total_users = CustomUser.objects.count()
+    
+    # Répartition par rôle
+    employees = CustomUser.objects.filter(role='employee').count()
+    employers = CustomUser.objects.filter(role='employer').count()
+    admins = CustomUser.objects.filter(role='admin').count()
+    
+    # Nombre d'utilisateurs vérifiés
+    verified_users = CustomUser.objects.filter(verified=True).count()
+    
+    # Statistiques des posts
+    total_posts = Post.objects.count()
+    active_posts = Post.objects.filter(final_date__gte='2025-03-22').count()  # Posts actifs (date finale >= aujourd'hui)
+    accepted_posts = Post.objects.filter(accepted=True).count()
+    
+    # Statistiques des CVs (PDFDocument au lieu de PDFUpload)
+    total_cvs = PDFDocument.objects.count()
+    
+    # Statistiques des réponses d’entretien
+    total_interview_responses = InterviewResponse.objects.count()
+    approved_responses = InterviewResponse.objects.filter(approved=True).count()
+    average_score = InterviewResponse.objects.aggregate(models.Avg('score'))['score__avg'] or 0.0
+    
+    # Statistiques des notifications
+    total_notifications = Notification.objects.count()
+    unread_notifications = Notification.objects.filter(read=False).count()
+    
+    # Préparer les données pour la réponse
+    stats = {
+        "users": {
+            "total": total_users,
+            "employees": employees,
+            "employers": employers,
+            "admins": admins,
+            "verified": verified_users
+        },
+        "posts": {
+            "total": total_posts,
+            "active": active_posts,
+            "accepted": accepted_posts
+        },
+        "cvs": {
+            "total": total_cvs
+        },
+        "interview_responses": {
+            "total": total_interview_responses,
+            "approved": approved_responses,
+            "average_score": round(average_score, 2)
+        },
+        "notifications": {
+            "total": total_notifications,
+            "unread": unread_notifications
+        }
+    }
+    
+    return Response(stats, status=status.HTTP_200_OK)
