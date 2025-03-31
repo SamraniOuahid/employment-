@@ -1,6 +1,4 @@
-Voici une version complète et corrigée du fichier `README.md` pour votre dépôt GitHub `https://github.com/SamraniOuahid/employment-`. Cette version adapte toutes les commandes Bash avec la syntaxe Markdown correcte (```bash) et les instructions JSON avec ```json, dans un format clair et prêt à être installé dans votre dépôt. J’ai également terminé les sections manquantes et organisé le tout dans un seul fichier cohérent.
 
----
 
 ### `README.md`
 
