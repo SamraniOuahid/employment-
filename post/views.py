@@ -248,3 +248,41 @@ def update_application_status(request):
         }, status=status.HTTP_200_OK)
     except PostApplication.DoesNotExist:
         return Response({"error": "Candidature non trouvée ou non autorisée"}, status=status.HTTP_404_NOT_FOUND)
+    
+
+
+
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def report_post(request):
+    post_id = request.data.get('post_id')
+    description = request.data.get('description')
+
+    if not description:
+        return Response({"error": "Une description du problème est requise"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        post = Post.objects.get(id=post_id)
+        # Vérifier si l'utilisateur a déjà signalé ce poste
+        if Report.objects.filter(post=post, user=request.user).exists():
+            return Response({"error": "Vous avez déjà signalé ce poste"}, status=status.HTTP_400_BAD_REQUEST)
+
+        report = Report.objects.create(
+            post=post,
+            user=request.user,
+            description=description
+        )
+        return Response({
+            "report": {
+                "id": report.id,
+                "post_id": post.id,
+                "user_id": request.user.id,
+                "description": report.description,
+                "reported_at": report.reported_at
+            }
+        }, status=status.HTTP_201_CREATED)
+    except Post.DoesNotExist:
+        return Response({"error": "Poste non trouvé"}, status=status.HTTP_404_NOT_FOUND)

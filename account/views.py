@@ -27,6 +27,38 @@ def register(request):
         return Response({'detail': 'Your account has been registered successfully!'}, status=status.HTTP_201_CREATED)
     else:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_user(request):
+    user = request.user
+    user_id = request.data.get('user_id')  # ID de l'utilisateur à supprimer (optionnel)
+
+    try:
+        if user.role == 'admin' and user_id:
+            # Admin supprime un autre utilisateur
+            target_user = CustomUser.objects.get(id=user_id)
+            if target_user == user:
+                return Response({"error": "L'admin ne peut pas se supprimer lui-même via cet endpoint"},
+                              status=status.HTTP_403_FORBIDDEN)
+            target_user.delete()
+            return Response({"message": f"Utilisateur {target_user.email} supprimé par l'admin"},
+                          status=status.HTTP_204_NO_CONTENT)
+        else:
+            # Utilisateur supprime son propre compte
+            if user_id and user_id != str(user.id):
+                return Response({"error": "Vous ne pouvez supprimer que votre propre compte"},
+                              status=status.HTTP_403_FORBIDDEN)
+            user.delete()
+            return Response({"message": "Votre compte a été supprimé avec succès"},
+                          status=status.HTTP_204_NO_CONTENT)
+    except CustomUser.DoesNotExist:
+        return Response({"error": "Utilisateur non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 
 
 @api_view(['GET'])
@@ -68,7 +100,6 @@ def update_user(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
@@ -85,6 +116,17 @@ def dashboard_stats(request):
         total_applications = PostApplication.objects.count()
         pending_applications = PostApplication.objects.filter(status='en_attente').count()
         accepted_applications = PostApplication.objects.filter(status='accepte').count()
+        total_reports = Report.objects.count()
+        reports_data = [
+            {
+                "id": report.id,
+                "post_title": report.post.title,
+                "user_email": report.user.email,
+                "description": report.description,
+                "reported_at": report.reported_at
+            }
+            for report in Report.objects.all()
+        ]
 
         stats = {
             "users": {"total": total_users},
@@ -95,6 +137,10 @@ def dashboard_stats(request):
                 "total": total_applications,
                 "pending": pending_applications,
                 "accepted": accepted_applications
+            },
+            "reports": {
+                "total": total_reports,
+                "details": reports_data
             }
         }
         return Response(stats, status=status.HTTP_200_OK)

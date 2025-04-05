@@ -68,3 +68,13 @@ class PostApplication(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.post.title} ({self.status})"
+    
+
+class Report(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste signalé")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur qui signale")
+    description = models.TextField(help_text="Raison du signalement (ex. : salaire incorrect)")
+    reported_at = models.DateTimeField(auto_now_add=True, help_text="Date du signalement")
+
+    def __str__(self):
+        return f"Signalement de {self.user.email} pour {self.post.title}"

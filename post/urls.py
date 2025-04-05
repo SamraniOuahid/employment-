@@ -15,4 +15,5 @@ urlpatterns = [
     path('interview/', InterviewView.as_view(), name='interview'),
     path('submit-interview/', SubmitInterviewResponse.as_view(), name='submit_interview'),
     path('evaluate-responses/', EvaluateTextResponsesAPIView.as_view(), name='evaluate_responses'),
+    path('report/', views.report_post, name='report_post'),
 ]
