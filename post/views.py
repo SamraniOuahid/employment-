@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import Post, PDFDocument, InterviewResponse, Notification
+from .models import *
 from .serializers import PostSerializer, PDFDocumentSerializer, EvaluateResponsesSerializer
 from .ai_algorithm import compare_cv_with_post
 from .utils import extract_text_from_pdf
@@ -162,11 +162,11 @@ class EvaluateTextResponsesAPIView(APIView):
             response.save()
 
         # Create notification if score is sufficient
-        if final_score > 70:
-            Notification.objects.create(
-                user=request.user,
-                notification=f"Congratulations! You passed the virtual interview for {post.title}. Please attend an in-person interview."
-            )
+        # if final_score > 70:
+        #     Notification.objects.create(
+        #         user=request.user,
+        #         notification=f"Congratulations! You passed the virtual interview for {post.title}. Please attend an in-person interview."
+        #     )
 
         return Response({
             "final_score": final_score,

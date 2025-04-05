@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
 from django.db import models  # Ajoutez cette ligne pour Avg
 from .models import CustomUser
-from post.models import Post, PDFDocument, InterviewResponse, Notification
+from post.models import Post, PDFDocument, InterviewResponse
 from .serializers import SignUpSerializer, UserSerializer
 
 @api_view(['POST'])

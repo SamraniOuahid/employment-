@@ -8,6 +8,7 @@ class Post(models.Model):
     title = models.CharField(max_length=200, blank=False, help_text="Titre du poste")
     description = models.TextField(blank=False, help_text="Description détaillée du poste")
     final_date = models.DateField(blank=True, null=True, help_text="Date limite de candidature")
+    salaire = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Salaire proposé en DH")
     uploaded_at = models.DateTimeField(default=now, help_text="Date et heure de création")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, help_text="Utilisateur ayant créé le poste")
     accepted = models.BooleanField(default=False, help_text="Indique si un candidat a été accepté")
@@ -41,18 +42,9 @@ class InterviewResponse(models.Model):
     question = models.TextField(help_text="Question posée au candidat")
     answer = models.TextField(help_text="Réponse du candidat")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="Horodatage de la réponse")
-    approved = models.BooleanField(default=False, help_text="Indique si la réponse est approuvée")
+    # approved = models.BooleanField(default=False, help_text="Indique si la réponse est approuvée")
     score = models.FloatField(default=0.0, help_text="Score attribué à la réponse")
 
     def __str__(self):
         return f"Response from {self.user.username} for {self.post.title}"
 
-class Notification(models.Model):
-    """Modèle représentant une notification envoyée à un utilisateur."""
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur recevant la notification")
-    notification = models.TextField(help_text="Message de la notification")
-    read = models.BooleanField(default=False, help_text="Indique si la notification a été lue")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="Date et heure de création")
-
-    def __str__(self):
-        return f"Notification for {self.user.username}"
