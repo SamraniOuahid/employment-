@@ -16,21 +16,6 @@ class Post(models.Model):
     def __str__(self):
         return self.title
 
-class PostApplication(models.Model):
-    STATUS_CHOICES = (
-        ('en_attente', 'En attente'),
-        ('accepte', 'Accepté'),
-        ('refuse', 'Refusé'),
-    )
-
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste auquel l'utilisateur postule")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur qui postule")
-    application_date = models.DateTimeField(auto_now_add=True, help_text="Date de la demande (automatique)")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente', help_text="Statut de la candidature")
-
-    def __str__(self):
-        return f"{self.user.email} - {self.post.title} ({self.status})"
-
 
 class PDFDocument(models.Model):
     """Modèle représentant un document PDF uploadé (par exemple, un CV)."""
@@ -64,3 +49,22 @@ class InterviewResponse(models.Model):
     def __str__(self):
         return f"Response from {self.user.username} for {self.post.title}"
 
+
+
+
+class PostApplication(models.Model):
+    STATUS_CHOICES = (
+        ('en_attente', 'En attente'),
+        ('accepte', 'Accepté'),
+        ('refuse', 'Refusé'),
+    )
+
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste auquel l'utilisateur postule")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur qui postule")
+    application_date = models.DateTimeField(auto_now_add=True, help_text="Date de la demande (automatique)")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente', help_text="Statut de la candidature")
+    cv = models.ForeignKey(PDFDocument, on_delete=models.SET_NULL, null=True, blank=True, help_text="CV utilisé pour la candidature")
+    interview = models.ForeignKey(InterviewResponse, on_delete=models.SET_NULL, null=True, blank=True, help_text="Entretien lié à la candidature")
+
+    def __str__(self):
+        return f"{self.user.email} - {self.post.title} ({self.status})"

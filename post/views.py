@@ -181,55 +181,68 @@ class EvaluateTextResponsesAPIView(APIView):
 
 
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def apply_to_post(request):
     post_id = request.data.get('post_id')
+    cv_id = request.data.get('cv_id')  # Nouveau champ
+
     try:
         post = Post.objects.get(id=post_id)
+        cv = PDFDocument.objects.get(id=cv_id, user=request.user) if cv_id else None
+
         # Vérifier si l'utilisateur a déjà postulé
         if PostApplication.objects.filter(post=post, user=request.user).exists():
             return Response({"error": "Vous avez déjà postulé à ce poste"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Créer une candidature
         application = PostApplication.objects.create(
             post=post,
-            user=request.user
+            user=request.user,
+            cv=cv
         )
         return Response({
             "application": {
                 "post_id": post.id,
                 "user_id": request.user.id,
+                "cv_id": cv.id if cv else None,
                 "status": application.status,
                 "application_date": application.application_date
             }
         }, status=status.HTTP_201_CREATED)
     except Post.DoesNotExist:
         return Response({"error": "Poste non trouvé"}, status=status.HTTP_404_NOT_FOUND)
-    
-
-
-
+    except PDFDocument.DoesNotExist:
+        return Response({"error": "CV non trouvé ou non autorisé"}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_application_status(request):
     application_id = request.data.get('application_id')
     new_status = request.data.get('status')
+    interview_id = request.data.get('interview_id')  # Nouveau champ
 
     try:
         application = PostApplication.objects.get(id=application_id, post__user=request.user)
         if new_status not in ['accepte', 'refuse', 'en_attente']:
             return Response({"error": "Statut invalide"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         application.status = new_status
+        if interview_id:
+            try:
+                interview = InterviewResponse.objects.get(id=interview_id, user=application.user)
+                application.interview = interview
+            except InterviewResponse.DoesNotExist:
+                return Response({"error": "Entretien non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+
         application.save()
         return Response({
             "application": {
                 "id": application.id,
                 "post_id": application.post.id,
                 "user_id": application.user.id,
+                "cv_id": application.cv.id if application.cv else None,
+                "interview_id": application.interview.id if application.interview else None,
                 "status": application.status
             }
         }, status=status.HTTP_200_OK)
