@@ -174,3 +174,64 @@ class EvaluateTextResponsesAPIView(APIView):
             "post_title": post.title,
             "message": "Text response evaluation completed."
         }, status=status.HTTP_200_OK)
+    
+
+
+
+
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def apply_to_post(request):
+    post_id = request.data.get('post_id')
+    try:
+        post = Post.objects.get(id=post_id)
+        # Vérifier si l'utilisateur a déjà postulé
+        if PostApplication.objects.filter(post=post, user=request.user).exists():
+            return Response({"error": "Vous avez déjà postulé à ce poste"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Créer une candidature
+        application = PostApplication.objects.create(
+            post=post,
+            user=request.user
+        )
+        return Response({
+            "application": {
+                "post_id": post.id,
+                "user_id": request.user.id,
+                "status": application.status,
+                "application_date": application.application_date
+            }
+        }, status=status.HTTP_201_CREATED)
+    except Post.DoesNotExist:
+        return Response({"error": "Poste non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+    
+
+
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_application_status(request):
+    application_id = request.data.get('application_id')
+    new_status = request.data.get('status')
+
+    try:
+        application = PostApplication.objects.get(id=application_id, post__user=request.user)
+        if new_status not in ['accepte', 'refuse', 'en_attente']:
+            return Response({"error": "Statut invalide"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        application.status = new_status
+        application.save()
+        return Response({
+            "application": {
+                "id": application.id,
+                "post_id": application.post.id,
+                "user_id": application.user.id,
+                "status": application.status
+            }
+        }, status=status.HTTP_200_OK)
+    except PostApplication.DoesNotExist:
+        return Response({"error": "Candidature non trouvée ou non autorisée"}, status=status.HTTP_404_NOT_FOUND)
