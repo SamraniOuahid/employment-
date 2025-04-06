@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from django.utils.timezone import now
+from django.utils.timezone import now, timedelta
 from django.core.exceptions import ValidationError
 
 class Post(models.Model):
@@ -78,3 +78,32 @@ class Report(models.Model):
 
     def __str__(self):
         return f"Signalement de {self.user.email} pour {self.post.title}"
+
+
+
+
+
+
+class Interview(models.Model):
+    STATUS_CHOICES = (
+        ('planned', 'Planifié'),
+        ('in_progress', 'En cours'),
+        ('completed', 'Terminé'),
+    )
+
+    post = models.ForeignKey('Post', on_delete=models.CASCADE, help_text="Poste lié à l’entretien")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Candidat passant l’entretien")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned', help_text="Statut de l’entretien")
+    start_date = models.DateTimeField(default=now, help_text="Date de début (automatique à la création)")
+    end_date = models.DateTimeField(help_text="Date de fin (24h après le début)")
+    questions = models.JSONField(null=True, blank=True, help_text="Questions posées (format JSON)")
+    responses = models.JSONField(null=True, blank=True, help_text="Réponses du candidat (format JSON)")
+    score = models.FloatField(null=True, blank=True, help_text="Score attribué à l’entretien")
+
+    def save(self, *args, **kwargs):
+        if not self.id:  # Si nouvelle instance
+            self.end_date = self.start_date + timedelta(hours=24)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Entretien pour {self.post.title} - {self.user.email} ({self.status})"
