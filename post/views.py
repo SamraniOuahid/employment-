@@ -56,7 +56,8 @@ def update_post(request, pk):
 @permission_classes([IsAuthenticated])
 def delete_post(request, pk):
     post = get_object_or_404(Post, id=pk)
-    if post.user != request.user:
+    # Autoriser le créateur OU un admin (superutilisateur)
+    if post.user != request.user and not request.user.is_superuser:
         return Response({"error": "Sorry, you cannot delete this post"}, status=status.HTTP_403_FORBIDDEN)
     post.delete()
     return Response({"message": "The post is deleted"}, status=status.HTTP_200_OK)
