@@ -287,3 +287,71 @@ def report_post(request):
         }, status=status.HTTP_201_CREATED)
     except Post.DoesNotExist:
         return Response({"error": "Poste non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+    
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def interview_data(request):
+    user = request.user
+
+    if user.is_superuser:  # Admin
+        # Récupérer toutes les données d’entretien
+        interviews = InterviewResponse.objects.all()
+        interview_data = [
+            {
+                "id": interview.id,
+                "post_title": interview.post.title,
+                "user_email": interview.user.email,
+                "question": interview.question,
+                "answer": interview.answer,
+                "score": interview.score,
+                "timestamp": interview.timestamp
+            } for interview in interviews
+        ]
+        return Response({
+            "total_interviews": interviews.count(),
+            "interview_data": interview_data
+        }, status=status.HTTP_200_OK)
+
+    elif user.role == 'employee':  # Employé
+        # Récupérer uniquement les entretiens de l’utilisateur connecté
+        interviews = InterviewResponse.objects.filter(user=user)
+        interview_data = [
+            {
+                "id": interview.id,
+                "post_title": interview.post.title,
+                "question": interview.question,
+                "answer": interview.answer,
+                "score": interview.score,
+                "timestamp": interview.timestamp
+            } for interview in interviews
+        ]
+        return Response({
+            "total_interviews": interviews.count(),
+            "interview_data": interview_data
+        }, status=status.HTTP_200_OK)
+
+    elif user.role == 'employer':  # Employeur
+        # Récupérer les entretiens liés aux postes créés par l’employeur
+        interviews = InterviewResponse.objects.filter(post__user=user)
+        interview_data = [
+            {
+                "id": interview.id,
+                "post_title": interview.post.title,
+                "user_email": interview.user.email,
+                "question": interview.question,
+                "answer": interview.answer,
+                "score": interview.score,
+                "timestamp": interview.timestamp
+            } for interview in interviews
+        ]
+        return Response({
+            "total_interviews": interviews.count(),
+            "interview_data": interview_data
+        }, status=status.HTTP_200_OK)
+
+    else:
+        return Response({"error": "Rôle non reconnu"}, status=status.HTTP_400_BAD_REQUEST)

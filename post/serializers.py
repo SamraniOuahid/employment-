@@ -1,11 +1,24 @@
 from rest_framework import serializers
 from .models import Post, PDFDocument
-
 class PostSerializer(serializers.ModelSerializer):
-    """Serializer pour le modèle Post."""
+    """Serializer pour le modèle Post avec les détails de l'utilisateur."""
+    user = serializers.SerializerMethodField()  # Personnaliser le champ user
+
     class Meta:
         model = Post
         fields = '__all__'
+
+    def get_user(self, obj):
+        """Retourne les détails personnalisés de l'utilisateur, incluant company_name, company_address, company_website."""
+        user = obj.user
+        return {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "company_name": user.company_name,
+            "company_address": user.company_address,
+            "company_website": user.company_website
+        }
 
 class PDFDocumentSerializer(serializers.ModelSerializer):
     """Serializer pour le modèle PDFDocument (CVs)."""

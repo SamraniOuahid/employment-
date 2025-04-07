@@ -1,7 +1,6 @@
 from django.urls import path
 from . import views
-from .views import PDFUploadView, CompareCVWithPost, InterviewView, SubmitInterviewResponse, EvaluateTextResponsesAPIView
-
+from .views import *
 urlpatterns = [
     path('new/', views.new_post, name='new_post'),
     path('getAll/', views.get_all_post, name='get_all_post'),
@@ -16,4 +15,5 @@ urlpatterns = [
     path('submit-interview/', SubmitInterviewResponse.as_view(), name='submit_interview'),
     path('evaluate-responses/', EvaluateTextResponsesAPIView.as_view(), name='evaluate_responses'),
     path('report/', views.report_post, name='report_post'),
+    path('interview-data/', interview_data, name='interview_data'),
 ]

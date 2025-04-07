@@ -106,7 +106,7 @@ def dashboard_stats(request):
     user = request.user
     role = user.role
 
-    if role == 'admin':
+    if user.is_superuser:  # Admin
         total_users = CustomUser.objects.count()
         total_posts = Post.objects.count()
         total_cvs = PDFDocument.objects.count()
@@ -127,9 +127,18 @@ def dashboard_stats(request):
             }
             for report in Report.objects.all()
         ]
+        # Liste des utilisateurs pour l’admin
+        users_list = [
+            {
+                "id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "role": u.role
+            } for u in CustomUser.objects.all()
+        ]
 
         stats = {
-            "users": {"total": total_users},
+            "users": {"total": total_users, "list": users_list},
             "posts": {"total": total_posts, "average_salaire": round(average_salaire, 2)},
             "cvs": {"total": total_cvs},
             "interview_responses": {"total": total_interview_responses, "average_score": round(average_score, 2)},
@@ -154,7 +163,7 @@ def dashboard_stats(request):
                 "question": response.question,
                 "answer": response.answer,
                 "score": response.score,
-                "response_date": response.response_date
+                "response_date": response.timestamp  # Changé de response_date à timestamp si nécessaire
             }
             for response in interview_responses
         ]
@@ -188,7 +197,6 @@ def dashboard_stats(request):
             }
             for post in employer_posts
         ]
-
         applications = PostApplication.objects.filter(post__user=user)
         application_data = [
             {
@@ -202,7 +210,6 @@ def dashboard_stats(request):
             }
             for app in applications
         ]
-
         stats = {
             "my_posts": post_data,
             "total_posts": employer_posts.count(),
