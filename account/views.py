@@ -99,7 +99,6 @@ def update_user(request):
     serializer = UserSerializer(user, many=False)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
@@ -127,7 +126,6 @@ def dashboard_stats(request):
             }
             for report in Report.objects.all()
         ]
-        # Liste des utilisateurs pour l’admin
         users_list = [
             {
                 "id": u.id,
@@ -163,7 +161,7 @@ def dashboard_stats(request):
                 "question": response.question,
                 "answer": response.answer,
                 "score": response.score,
-                "response_date": response.timestamp  # Changé de response_date à timestamp si nécessaire
+                "response_date": response.timestamp
             }
             for response in interview_responses
         ]
@@ -206,7 +204,12 @@ def dashboard_stats(request):
                 "cv_id": app.cv.id if app.cv else None,
                 "interview_id": app.interview.id if app.interview else None,
                 "application_date": app.application_date,
-                "status": app.status
+                "status": app.status,
+                "test": {
+                    "question": app.interview.question if app.interview else None,
+                    "answer": app.interview.answer if app.interview else None,
+                    "score": app.interview.score if app.interview else None
+                } if app.interview else None  # Ajout du champ test
             }
             for app in applications
         ]

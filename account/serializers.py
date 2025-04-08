@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from .models import CustomUser
 
 class SignUpSerializer(serializers.ModelSerializer):
-    """Sérializer pour l'inscription des utilisateurs."""
     password = serializers.CharField(write_only=True, min_length=4)
 
     class Meta:
@@ -20,20 +19,22 @@ class SignUpSerializer(serializers.ModelSerializer):
             'last_name': {'required': True, 'allow_blank': False},
             'email': {'required': True, 'allow_blank': False},
             'password': {'write_only': True},
-            'company_name': {'required': False},  # Optionnel pour les employeurs
-            'company_address': {'required': False},  # Optionnel pour les employeurs
-            'company_website': {'required': False},  # Optionnel pour les employeurs
+            'company_name': {'required': False},
+            'company_address': {'required': False},
+            'company_website': {'required': False},
         }
 
     def create(self, validated_data):
-        """Crée un nouvel utilisateur avec un mot de passe haché."""
         try:
-            validate_password(validated_data['password'])  # Valide le mot de passe
+            validate_password(validated_data['password'])
         except ValidationError as e:
             raise serializers.ValidationError({'password': e.messages})
 
+        # Définir is_superuser à True si role est 'admin'
+        is_superuser = validated_data['role'] == 'admin'
+
         user = CustomUser.objects.create_user(
-            username=validated_data['email'],  # Utilisez l'email comme nom d'utilisateur
+            username=validated_data['email'],
             email=validated_data['email'],
             password=validated_data['password'],
             first_name=validated_data['first_name'],
@@ -43,10 +44,10 @@ class SignUpSerializer(serializers.ModelSerializer):
             company_name=validated_data.get('company_name', None),
             company_address=validated_data.get('company_address', None),
             company_website=validated_data.get('company_website', None),
+            is_superuser=is_superuser,  # Ajouter cette ligne
+            is_staff=is_superuser       # Optionnel : pour accès à l’interface admin
         )
         return user
-
-
 class UserSerializer(serializers.ModelSerializer):
     """Sérializer pour représenter les utilisateurs."""
 
