@@ -1,6 +1,6 @@
 # accounts/views.py
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -224,3 +224,23 @@ def dashboard_stats(request):
 
     else:
         return Response({"error": "Rôle non reconnu"}, status=status.HTTP_400_BAD_REQUEST)
+    
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_user(request, user_id):
+    """Permet à un admin de valider un utilisateur (verified=True)."""
+    if not request.user.is_superuser:
+        return Response({"error": "Seul un admin peut valider un utilisateur"}, status=status.HTTP_403_FORBIDDEN)
+
+    user_to_verify = get_object_or_404(CustomUser, id=user_id)
+    if user_to_verify.verified:
+        return Response({"message": f"L'utilisateur {user_to_verify.email} est déjà vérifié"}, status=status.HTTP_400_BAD_REQUEST)
+
+    user_to_verify.verified = True
+    user_to_verify.save()
+    serializer = UserSerializer(user_to_verify, many=False)
+    return Response({
+        "message": f"L'utilisateur {user_to_verify.email} a été vérifié avec succès",
+        "user": serializer.data
+    }, status=status.HTTP_200_OK)

@@ -28,13 +28,21 @@ def get_by_id(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def new_post(request):
+    """Création d'un nouveau poste, réservé aux employeurs vérifiés."""
+    user = request.user
+    if user.role != 'employer':
+        return Response({"error": "Seul un employeur peut créer un poste"}, status=status.HTTP_403_FORBIDDEN)
+    if not user.verified:
+        return Response({"error": "Votre compte doit être vérifié par un admin pour créer des postes"}, status=status.HTTP_403_FORBIDDEN)
+
     data = request.data
     serializer = PostSerializer(data=data)
     if serializer.is_valid():
-        post = Post.objects.create(**data, user=request.user)
+        post = Post.objects.create(**data, user=user)
         res = PostSerializer(post, many=False)
-        return Response({"post": res.data})
+        return Response({"post": res.data}, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Update a post
 @api_view(['PUT'])
