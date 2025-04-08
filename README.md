@@ -1,22 +1,34 @@
-Voici le contenu formaté en `README.md` :
+
+
+---
 
 ```markdown
 # Employment Platform
 
-Bienvenue dans **Employment Platform**, une application backend développée avec Django et Django REST Framework pour automatiser le processus de recrutement. Ce projet permet aux employeurs de publier des offres d’emploi, aux employés de postuler avec leurs CVs, et utilise l’intelligence artificielle pour comparer les CVs aux postes, générer des questions d’entretien, et évaluer les réponses textuelles.
+Bienvenue dans **Employment Platform**, une application backend développée avec Django et Django REST Framework pour automatiser le processus de recrutement. Ce projet permet aux employeurs vérifiés de publier des offres d’emploi approuvées par un admin, aux employés de postuler avec leurs CVs, et utilise l’intelligence artificielle pour comparer les CVs aux postes, générer des questions d’entretien, et évaluer les réponses textuelles.
 
 ## Fonctionnalités
-- **Gestion des utilisateurs** : Inscription, authentification JWT, mise à jour des informations, suppression de compte (par l’utilisateur ou un admin), rôles (`admin`, `employee`, `employer`).
-- **Gestion des postes** : Création, listing, mise à jour, suppression des offres d’emploi avec salaire, et signalement des postes incorrects.
-- **Upload de CVs** : Téléversement de fichiers PDF (CVs) pour candidatures et analyse.
-- **Candidatures** : Suivi des candidatures avec statut (`en_attente`, `accepte`, `refuse`), CV et entretien associés.
-- **Comparaison CV/Poste** : Utilisation de TF-IDF pour évaluer la compatibilité entre un CV et une description de poste.
-- **Entretiens virtuels** : Génération de questions avec T5 et évaluation des réponses avec Sentence Transformers.
+- **Gestion des utilisateurs** :
+  - Inscription avec rôles (`admin`, `employee`, `employer`) et authentification JWT.
+  - Mise à jour et suppression de compte (par l’utilisateur ou un admin).
+  - Vérification des employeurs par un admin (`verified`) pour autoriser la création de postes.
+- **Gestion des postes** :
+  - Création par des employeurs vérifiés uniquement, avec approbation admin (`approved`) avant publication publique.
+  - Listing, mise à jour, suppression et signalement des postes.
+  - Informations sur l’entreprise (`company_name`, `company_address`, `company_website`) incluses.
+- **Upload de CVs** : Téléversement de fichiers PDF pour candidatures et analyse.
+- **Candidatures** :
+  - Suivi avec statut (`en_attente`, `accepte`, `refuse`), CV et entretien associés.
+  - Détails des entretiens (`question`, `answer`, `score`) inclus pour les employeurs.
+- **Comparaison CV/Poste** : Évaluation de compatibilité via TF-IDF et similarité cosinus.
+- **Entretiens virtuels** :
+  - Génération de questions avec Google Flan-T5.
+  - Évaluation des réponses avec Sentence Transformers (`all-MiniLM-L6-v2`).
 - **Dashboards personnalisés** :
-  - **Admin** : Statistiques globales et signalements.
+  - **Admin** : Statistiques globales, liste des utilisateurs, signalements.
   - **Employé** : Historique des entretiens et candidatures.
-  - **Employeur** : Postes publiés et candidatures reçues.
-- **Signalements** : Possibilité de signaler des postes avec des informations incorrectes (ex. : salaire erroné).
+  - **Employeur** : Postes publiés et candidatures avec détails d’entretien.
+- **Signalements** : Signalement des postes incorrects (ex. : salaire erroné).
 
 ## Pré-requis
 - Python 3.8+
@@ -80,451 +92,429 @@ Bienvenue dans **Employment Platform**, une application backend développée ave
 ## Routes de l’API
 
 ### Authentification
-Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `Authorization: Bearer <token>` obtenu via `/api/token/`.
+Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `Authorization: Bearer <token>` obtenu via `/api/token/`. Les endpoints **[Auth, Admin]** sont réservés aux superutilisateurs (`is_superuser=True`).
 
-1. **POST /api/register/** - Inscription  
-   Description : Crée un nouvel utilisateur.  
-   Body (JSON) :
-   ```json
-   {
-       "username": "testuser",
-       "email": "testuser@example.com",
-       "password": "testpass123",
-       "role": "employee"
-   }
-   ```
-   Réponse :
-   ```json
-   {
-       "id": 1,
-       "username": "testuser",
-       "email": "testuser@example.com",
-       "role": "employee"
-   }
-   ```
-
-2. **POST /api/token/** - Obtenir un token JWT  
-   Description : Authentifie un utilisateur et retourne un token.  
-   Body (JSON) :
-   ```json
-   {
-       "email": "testuser@example.com",
-       "password": "testpass123"
-   }
-   ```
-   Réponse :
-   ```json
-   {
-       "refresh": "long_refresh_token",
-       "access": "votre_access_token"
-   }
-   ```
-
-3. **GET /api/current-user/** - Détails de l’utilisateur **[Auth]**  
-   Description : Récupère les informations de l’utilisateur connecté.  
-   Headers : `Authorization: Bearer <token>`  
-   Réponse :
-   ```json
-   {
-       "id": 1,
-       "username": "testuser",
-       "email": "testuser@example.com",
-       "role": "employee"
-   }
-   ```
-
-4. **PUT /api/update-user/** - Mise à jour de l’utilisateur **[Auth]**  
-   Description : Met à jour les informations de l’utilisateur.  
-   Headers : `Authorization: Bearer <token>`  
-   Body (JSON) :
-   ```json
-   {
-       "email": "newemail@example.com"
-   }
-   ```
-   Réponse :
-   ```json
-   {
-       "id": 1,
-       "username": "testuser",
-       "email": "newemail@example.com",
-       "role": "employee"
-   }
-   ```
-
-5. **DELETE /api/users/delete/** - Supprimer un utilisateur **[Auth]**  
-   Description : Supprime un compte.  
-   - **Utilisateur** : Supprime son propre compte (sans paramètre).  
-     Headers : `Authorization: Bearer <token>`  
-     Exemple : `curl -X DELETE http://localhost:8000/api/users/delete/ -H "Authorization: Bearer <token>"`  
-     Réponse : `{"message": "Votre compte a été supprimé avec succès"}`  
-   - **Admin** : Supprime un autre compte avec `user_id`.  
-     Body (JSON) :
+1. **POST /api/register/** - Inscription
+   - **Description** : Crée un utilisateur. Si `role='admin'`, `is_superuser=True`.
+   - **Body** :
      ```json
      {
-         "user_id": "2"
+         "first_name": "John",
+         "last_name": "Doe",
+         "email": "john@example.com",
+         "password": "pass1234",
+         "role": "employer",
+         "company_name": "Tech Corp"
      }
      ```
-     Exemple : `curl -X DELETE http://localhost:8000/api/users/delete/ -H "Authorization: Bearer <admin_token>" -d '{"user_id": "2"}'`  
-     Réponse : `{"message": "Utilisateur test2@example.com supprimé par l'admin"}`
+   - **Réponse** :
+     ```json
+     {
+         "detail": "Your account has been registered successfully!"
+     }
+     ```
+
+2. **POST /api/token/** - Obtenir un token JWT
+   - **Body** :
+     ```json
+     {
+         "email": "john@example.com",
+         "password": "pass1234"
+     }
+     ```
+   - **Réponse** :
+     ```json
+     {
+         "refresh": "...",
+         "access": "..."
+     }
+     ```
+
+3. **GET /api/current-user/** - Détails de l’utilisateur **[Auth]**
+   - **Réponse** :
+     ```json
+     {
+         "id": 1,
+         "first_name": "John",
+         "last_name": "Doe",
+         "email": "john@example.com",
+         "role": "employer",
+         "verified": false,
+         "company_name": "Tech Corp"
+     }
+     ```
+
+4. **PUT /api/update-user/** - Mise à jour de l’utilisateur **[Auth]**
+   - **Body** :
+     ```json
+     {
+         "first_name": "Jane",
+         "company_name": "New Corp"
+     }
+     ```
+   - **Réponse** : [Détails mis à jour]
+
+5. **DELETE /api/users/delete/** - Supprimer un utilisateur **[Auth]**
+   - **Utilisateur** : Supprime son propre compte (sans body).
+     - **Réponse** : `{"message": "Votre compte a été supprimé avec succès"}`
+   - **Admin** : Supprime un autre compte.
+     - **Body** :
+       ```json
+       {
+           "user_id": "2"
+       }
+       ```
+     - **Réponse** : `{"message": "Utilisateur test@example.com supprimé par l'admin"}`
+
+6. **POST /api/verify-user/<user_id>/** - Vérifier un employeur **[Auth, Admin]**
+   - **Description** : Définit `verified=True` pour un employeur.
+   - **Réponse** :
+     ```json
+     {
+         "message": "L'utilisateur john@example.com a été vérifié avec succès",
+         "user": {
+             "id": 2,
+             "first_name": "John",
+             "last_name": "Doe",
+             "email": "john@example.com",
+             "role": "employer",
+             "verified": true,
+             "company_name": "Tech Corp"
+         }
+     }
+     ```
 
 ### Gestion des postes
-6. **POST /post/new/** - Créer un poste **[Auth]**  
-   Description : Ajoute un nouveau poste (employeur uniquement).  
-   Headers : `Authorization: Bearer <token>`  
-   Body (JSON) :
-   ```json
-   {
-       "title": "Développeur Python",
-       "description": "Recherche un développeur Python expérimenté.",
-       "final_date": "2025-04-01",
-       "salaire": 10000
-   }
-   ```
-   Réponse :
-   ```json
-   {
-       "post": {
-           "id": 1,
-           "title": "Développeur Python",
-           "description": "Recherche un développeur Python expérimenté.",
-           "final_date": "2025-04-01",
-           "salaire": "10000.00",
-           "uploaded_at": "2025-04-05T12:00:00Z",
-           "user": 1,
-           "accepted": false
-       }
-   }
-   ```
+7. **POST /post/new/** - Créer un poste **[Auth]**
+   - **Description** : Réservé aux employeurs avec `verified=True`.
+   - **Body** :
+     ```json
+     {
+         "title": "Développeur Python",
+         "description": "Recherche un développeur Python."
+     }
+     ```
+   - **Réponse** :
+     ```json
+     {
+         "post": {
+             "id": 1,
+             "title": "Développeur Python",
+             "description": "Recherche un développeur Python.",
+             "final_date": null,
+             "salaire": null,
+             "uploaded_at": "2025-04-08T12:00:00Z",
+             "accepted": false,
+             "approved": false,
+             "user": {
+                 "id": 2,
+                 "email": "john@example.com",
+                 "role": "employer",
+                 "company_name": "Tech Corp",
+                 "company_address": null,
+                 "company_website": null
+             }
+         }
+     }
+     ```
+   - **Erreur** (non vérifié) :
+     ```json
+     {
+         "error": "Votre compte doit être vérifié par un admin pour créer des postes"
+     }
+     ```
 
-7. **GET /post/getAll/** - Lister tous les posts  
-   Description : Retourne tous les postes.  
-   Réponse :
-   ```json
-   {
-       "posts": [
-           {
-               "id": 1,
-               "title": "Développeur Python",
-               "description": "Recherche un développeur Python expérimenté.",
-               "final_date": "2025-04-01",
-               "salaire": "10000.00",
-               "uploaded_at": "2025-04-05T12:00:00Z",
-               "user": 1,
-               "accepted": false
-           }
-       ]
-   }
-   ```
+8. **GET /post/getAll/** - Lister les postes approuvés
+   - **Description** : Retourne uniquement les postes avec `approved=True`.
+   - **Réponse** :
+     ```json
+     {
+         "posts": [
+             {
+                 "id": 1,
+                 "title": "Développeur Python",
+                 "description": "Recherche un développeur Python.",
+                 "final_date": null,
+                 "salaire": null,
+                 "uploaded_at": "2025-04-08T12:00:00Z",
+                 "accepted": false,
+                 "approved": true,
+                 "user": {
+                     "id": 2,
+                     "email": "john@example.com",
+                     "role": "employer",
+                     "company_name": "Tech Corp",
+                     "company_address": "123 Tech St",
+                     "company_website": "https://techcorp.com"
+                 }
+             }
+         ]
+     }
+     ```
 
-8. **GET /post/get/<id>/** - Récupérer un post  
-   Description : Récupère un poste spécifique par ID.  
-   Exemple : `GET /post/get/1/`  
-   Réponse :
-   ```json
-   {
-       "post": {
-           "id": 1,
-           "title": "Développeur Python",
-           "description": "Recherche un développeur Python expérimenté.",
-           "final_date": "2025-04-01",
-           "salaire": "10000.00",
-           "uploaded_at": "2025-04-05T12:00:00Z",
-           "user": 1,
-           "accepted": false
-       }
-   }
-   ```
+9. **GET /post/get/<id>/** - Récupérer un poste
+   - **Exemple** : `GET /post/get/1/`
+   - **Réponse** : [Détails du poste]
 
-9. **PUT /post/update/<id>/** - Mettre à jour un post **[Auth]**  
-   Description : Modifie un poste existant (employeur uniquement).  
-   Exemple : `PUT /post/update/1/`  
-   Headers : `Authorization: Bearer <token>`  
-   Body (JSON) :
-   ```json
-   {
-       "title": "Développeur Python Senior",
-       "description": "Recherche un développeur Python senior.",
-       "final_date": "2025-05-01",
-       "salaire": 12000
-   }
-   ```
-   Réponse :
-   ```json
-   {
-       "post": {
-           "id": 1,
-           "title": "Développeur Python Senior",
-           "description": "Recherche un développeur Python senior.",
-           "final_date": "2025-05-01",
-           "salaire": "12000.00",
-           "uploaded_at": "2025-04-05T12:00:00Z",
-           "user": 1,
-           "accepted": false
-       }
-   }
-   ```
-
-10. **DELETE /post/delete/<id>/** - Supprimer un post **[Auth]**  
-    Description : Supprime un poste (employeur uniquement).  
-    Exemple : `DELETE /post/delete/1/`  
-    Headers : `Authorization: Bearer <token>`  
-    Réponse :
-    ```json
-    {
-        "message": "The post is deleted"
-    }
-    ```
-
-11. **POST /post/apply/** - Postuler à un poste **[Auth]**  
-    Description : Soumet une candidature à un poste (employé uniquement).  
-    Headers : `Authorization: Bearer <token>`  
-    Body (JSON) :
-    ```json
-    {
-        "post_id": "1",
-        "cv_id": "1"
-    }
-    ```
-    Réponse :
-    ```json
-    {
-        "application": {
-            "post_id": 1,
-            "user_id": 2,
-            "cv_id": 1,
-            "status": "en_attente",
-            "application_date": "2025-04-05T12:00:00Z"
-        }
-    }
-    ```
-
-12. **PATCH /post/update-application/** - Mettre à jour une candidature **[Auth]**  
-    Description : Modifie le statut d’une candidature (employeur uniquement).  
-    Headers : `Authorization: Bearer <token>`  
-    Body (JSON) :
-    ```json
-    {
-        "application_id": "1",
-        "status": "accepte",
-        "interview_id": "1"
-    }
-    ```
-    Réponse :
-    ```json
-    {
-        "application": {
-            "id": 1,
-            "post_id": 1,
-            "user_id": 2,
-            "cv_id": 1,
-            "interview_id": 1,
-            "status": "accepte"
-        }
-    }
-    ```
-
-13. **POST /post/report/** - Signaler un poste **[Auth]**  
-    Description : Signale un poste avec des informations incorrectes.  
-    Headers : `Authorization: Bearer <token>`  
-    Body (JSON) :
-    ```json
-    {
-        "post_id": "1",
-        "description": "Salaire incorrect, annoncé 10000 mais offre 5000"
-    }
-    ```
-    Réponse :
-    ```json
-    {
-        "report": {
-            "id": 1,
-            "post_id": 1,
-            "user_id": 2,
-            "description": "Salaire incorrect, annoncé 10000 mais offre 5000",
-            "reported_at": "2025-04-05T12:00:00Z"
-        }
-    }
-    ```
-
-### Gestion des CVs et entretiens
-14. **POST /post/upload/** - Uploader un PDF **[Auth]**  
-    Description : Ajoute un fichier PDF (ex. : CV).  
-    Headers : `Authorization: Bearer <token>`  
-    Body (form-data) :
-    ```
-    title: "Mon CV" (Text)
-    pdf_file: sélectionnez un fichier PDF (File)
-    ```
-    Réponse :
-    ```json
-    {
-        "id": 1,
-        "title": "Mon CV",
-        "pdf_file": "cvs/cv.pdf",
-        "uploaded_at": "2025-04-05T12:00:00Z"
-    }
-    ```
-
-15. **POST /post/compare-cv-with-post/** - Comparer un CV avec un poste  
-    Description : Évalue la compatibilité d’un CV avec un poste.  
-    Body (JSON) :
-    ```json
-    {
-        "cv_id": 1,
-        "post_id": 1
-    }
-    ```
-    Réponse :
-    ```json
-    {
-        "message": "You are eligible for an interview.",
-        "similarity_score": 85.23,
-        "next_step": "interview"
-    }
-    ```
-
-16. **POST /post/interview/** - Générer des questions  
-    Description : Génère des questions d’entretien basées sur un poste.  
-    Body (JSON) :
-    ```json
-    {
-        "post_id": 1
-    }
-    ```
-    Réponse :
-    ```json
-    {
-        "questions": [
-            "What experience do you have with Python?",
-            "How would you optimize a Python script?"
-        ],
-        "post_title": "Développeur Python"
-    }
-    ```
-
-17. **POST /post/submit-interview/** - Soumettre des réponses **[Auth]**  
-    Description : Enregistre les réponses textuelles d’un entretien.  
-    Headers : `Authorization: Bearer <token>`  
-    Body (JSON) :
-    ```json
-    {
-        "post_id": 1,
-        "responses": [
-            {
-                "question": "What experience do you have with Python?",
-                "answer": "I have 3 years of experience."
-            }
-        ]
-    }
-    ```
-    Réponse :
-    ```json
-    {
-        "message": "Text responses submitted successfully."
-    }
-    ```
-
-18. **POST /post/evaluate-responses/** - Évaluer les réponses **[Auth]**  
-    Description : Évalue les réponses par rapport au poste.  
-    Headers : `Authorization: Bearer <token>`  
-    Body (JSON) :
-    ```json
-    {
-        "post_id": 1,
-        "candidate_answers": [
-            "I have 3 years of experience with Python.",
-            "I optimize scripts using profiling tools."
-        ]
-    }
-    ```
-    Réponse :
-    ```json
-    {
-        "final_score": 78.45,
-        "scores": [82.10, 74.80],
-        "post_title": "Développeur Python",
-        "message": "Text response evaluation completed."
-    }
-    ```
-
-19. **GET /api/dashboard-stats/** - Statistiques du tableau de bord **[Auth]**  
-    Description : Récupère des statistiques selon le rôle.  
-    Headers : `Authorization: Bearer <token>`  
-    Réponse :
-    - **Admin** :
+10. **PUT /post/update/<id>/** - Mettre à jour un poste **[Auth]**
+    - **Body** :
       ```json
       {
-          "users": {"total": 10},
-          "posts": {"total": 5, "average_salaire": 8000.00},
-          "cvs": {"total": 15},
-          "interview_responses": {"total": 20, "average_score": 85.50},
-          "applications": {"total": 8, "pending": 5, "accepted": 2},
-          "reports": {
-              "total": 1,
-              "details": [
-                  {
-                      "id": 1,
-                      "post_title": "Développeur Senior",
-                      "user_email": "employee@example.com",
-                      "description": "Salaire incorrect",
-                      "reported_at": "2025-04-05T12:00:00Z"
-                  }
-              ]
+          "title": "Développeur Python Senior"
+      }
+      ```
+    - **Réponse** : [Poste mis à jour]
+
+11. **DELETE /post/delete/<id>/** - Supprimer un poste **[Auth]**
+    - **Réponse** :
+      ```json
+      {
+          "message": "The post is deleted"
+      }
+      ```
+
+12. **POST /post/approve-post/<id>/** - Approuver un poste **[Auth, Admin]**
+    - **Description** : Définit `approved=True` pour un poste.
+    - **Réponse** :
+      ```json
+      {
+          "message": "Le poste 'Développeur Python' a été approuvé avec succès",
+          "post": {
+              "id": 1,
+              "title": "Développeur Python",
+              "approved": true,
+              "user": {
+                  "id": 2,
+                  "email": "john@example.com",
+                  "role": "employer",
+                  "company_name": "Tech Corp"
+              }
           }
       }
       ```
-    - **Employé** :
+
+13. **POST /post/apply/** - Postuler à un poste **[Auth]**
+    - **Body** :
       ```json
       {
-          "interview_history": [
+          "post_id": "1",
+          "cv_id": "1"
+      }
+      ```
+    - **Réponse** :
+      ```json
+      {
+          "application": {
+              "post_id": 1,
+              "user_id": 3,
+              "cv_id": 1,
+              "status": "en_attente"
+          }
+      }
+      ```
+
+14. **PATCH /post/update-application/** - Mettre à jour une candidature **[Auth]**
+    - **Body** :
+      ```json
+      {
+          "application_id": "1",
+          "status": "accepte",
+          "interview_id": "1"
+      }
+      ```
+    - **Réponse** :
+      ```json
+      {
+          "application": {
+              "id": 1,
+              "status": "accepte",
+              "interview_id": 1
+          }
+      }
+      ```
+
+15. **POST /post/report/** - Signaler un poste **[Auth]**
+    - **Body** :
+      ```json
+      {
+          "post_id": "1",
+          "description": "Salaire incorrect"
+      }
+      ```
+    - **Réponse** :
+      ```json
+      {
+          "report": {
+              "id": 1,
+              "post_id": 1,
+              "description": "Salaire incorrect"
+          }
+      }
+      ```
+
+### Gestion des CVs et entretiens
+16. **POST /post/upload/** - Uploader un CV **[Auth]**
+    - **Body (form-data)** :
+      ```
+      title: "Mon CV"
+      pdf_file: <fichier.pdf>
+      ```
+    - **Réponse** :
+      ```json
+      {
+          "id": 1,
+          "title": "Mon CV",
+          "pdf_file": "cvs/cv.pdf"
+      }
+      ```
+
+17. **POST /post/compare-cv-with-post/** - Comparer un CV avec un poste
+    - **Body** :
+      ```json
+      {
+          "cv_id": 1,
+          "post_id": 1
+      }
+      ```
+    - **Réponse** :
+      ```json
+      {
+          "similarity_score": 85.23,
+          "next_step": "interview"
+      }
+      ```
+
+18. **POST /post/interview/** - Générer des questions
+    - **Body** :
+      ```json
+      {
+          "post_id": 1
+      }
+      ```
+    - **Réponse** :
+      ```json
+      {
+          "questions": [
+              "What experience do you have with Python?"
+          ]
+      }
+      ```
+
+19. **POST /post/submit-interview/** - Soumettre des réponses **[Auth]**
+    - **Body** :
+      ```json
+      {
+          "post_id": 1,
+          "responses": [
               {
-                  "id": 1,
-                  "post_title": "Développeur Senior",
-                  "question": "Quelle est votre expérience ?",
-                  "answer": "3 ans",
-                  "score": 85.0,
-                  "response_date": "2025-04-05T12:00:00Z"
-              }
-          ],
-          "total_responses": 1,
-          "average_score": 85.0,
-          "applications": [
-              {
-                  "post_title": "Développeur Senior",
-                  "cv_id": 1,
-                  "interview_id": 1,
-                  "status": "accepte",
-                  "application_date": "2025-04-05T12:00:00Z"
+                  "question": "What experience do you have with Python?",
+                  "answer": "3 years"
               }
           ]
       }
       ```
-    - **Employeur** :
+    - **Réponse** :
+      ```json
+      {
+          "message": "Text responses submitted successfully."
+      }
+      ```
+
+20. **POST /post/evaluate-responses/** - Évaluer les réponses **[Auth]**
+    - **Body** :
+      ```json
+      {
+          "post_id": 1,
+          "candidate_answers": ["3 years"]
+      }
+      ```
+    - **Réponse** :
+      ```json
+      {
+          "final_score": 85.0,
+          "scores": [85.0]
+      }
+      ```
+
+21. **GET /api/interview-data/** - Données des entretiens **[Auth]**
+    - **Réponse (Employeur)** :
+      ```json
+      {
+          "total_interviews": 1,
+          "interview_data": [
+              {
+                  "id": 1,
+                  "post_title": "Développeur Python",
+                  "user_email": "employee@example.com",
+                  "question": "What experience do you have with Python?",
+                  "answer": "3 years",
+                  "score": 85.0
+              }
+          ]
+      }
+      ```
+
+22. **GET /api/dashboard-stats/** - Statistiques du tableau de bord **[Auth]**
+    - **Réponse (Employeur)** :
       ```json
       {
           "my_posts": [
               {
                   "id": 1,
-                  "title": "Développeur Senior",
+                  "title": "Développeur Python",
                   "salaire": "10000.00",
-                  "uploaded_at": "2025-04-05T12:00:00Z"
+                  "uploaded_at": "2025-04-08T12:00:00Z"
               }
           ],
           "total_posts": 1,
           "applications": [
               {
                   "id": 1,
-                  "post_title": "Développeur Senior",
+                  "post_title": "Développeur Python",
                   "applicant_email": "employee@example.com",
                   "cv_id": 1,
                   "interview_id": 1,
-                  "application_date": "2025-04-05T12:00:00Z",
-                  "status": "accepte"
+                  "application_date": "2025-04-08T12:00:00Z",
+                  "status": "accepte",
+                  "test": {
+                      "question": "What experience do you have with Python?",
+                      "answer": "3 years",
+                      "score": 85.0
+                  }
               }
           ],
           "total_applications": 1,
           "pending_applications": 0
       }
       ```
+    - **Réponse (Admin)** : Statistiques globales.
+    - **Réponse (Employé)** : Historique des entretiens.
+
+## Contribution
+1. Forkez le projet.
+2. Créez une branche (`git checkout -b feature/nouvelle-fonction`).
+3. Commitez vos changements (`git commit -m "Ajout de nouvelle fonction"`).
+4. Poussez vers la branche (`git push origin feature/nouvelle-fonction`).
+5. Ouvrez une Pull Request.
+
+## Licence
+Ce projet est sous licence MIT.
 ```
+
+---
+
+### Changements par rapport à l’ancien `README.md`
+1. **Fonctionnalités mises à jour** :
+   - Ajout de la vérification des employeurs (`verified`) et de l’approbation des postes (`approved`).
+   - Inclusion des champs `company_name`, `company_address`, `company_website` dans les postes.
+   - Ajout du champ `test` (question, answer, score) dans les candidatures pour les employeurs.
+2. **Endpoints actualisés** :
+   - Ajout de `POST /api/verify-user/<user_id>/` et `POST /post/approve-post/<id>/`.
+   - Mise à jour de `POST /post/new/` avec la restriction `verified=True`.
+   - Mise à jour de `GET /post/getAll/` pour ne retourner que les postes approuvés.
+   - Réponses enrichies avec les nouveaux champs dans `GET /post/getAll/` et `GET /api/dashboard-stats/`.
+3. **Clarté** :
+   - Descriptions plus précises des restrictions (ex. : "Réservé aux employeurs avec `verified=True`").
+   - Exemples de réponses reflétant les modifications (ex. : `approved`, `test`).
+
+Remplacez votre ancien `README.md` par ce nouveau contenu dans votre projet. Testez les endpoints documentés avec Postman pour vous assurer qu’ils correspondent à l’implémentation actuelle. Si vous voulez ajouter d’autres sections (ex. : exemples de configuration, notes spécifiques), dites-le-moi !
