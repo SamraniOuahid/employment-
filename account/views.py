@@ -18,17 +18,17 @@ def register(request):
     serializer = SignUpSerializer(data=data)
 
     if serializer.is_valid():
-        # Vérifier si l'email est déjà utilisé
+        # Vérifier si l'username ou l'email est déjà utilisé
+        if CustomUser.objects.filter(username=data['username']).exists():
+            return Response({'detail': 'Ce nom d’utilisateur est déjà pris !'}, status=status.HTTP_400_BAD_REQUEST)
         if CustomUser.objects.filter(email=data['email']).exists():
-            return Response({'detail': 'This email already exists!'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Cet email est déjà utilisé !'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Créer un nouvel utilisateur via le sérializer
         user = serializer.save()
-        return Response({'detail': 'Your account has been registered successfully!'}, status=status.HTTP_201_CREATED)
+        return Response({'detail': 'Votre compte a été enregistré avec succès !'}, status=status.HTTP_201_CREATED)
     else:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])

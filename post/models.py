@@ -11,7 +11,7 @@ class Post(models.Model):
     salaire = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Salaire proposé en DH")
     uploaded_at = models.DateTimeField(default=now, help_text="Date et heure de création")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, help_text="Utilisateur ayant créé le poste")
-    accepted = models.BooleanField(default=False, help_text="Indique si un candidat a été accepté")
+    
 
     def __str__(self):
         return self.title
@@ -58,18 +58,28 @@ class PostApplication(models.Model):
         ('accepte', 'Accepté'),
         ('refuse', 'Refusé'),
     )
+    INTERVIEW_STEPS = (
+        ('pending', 'En attente'),
+        ('cv_compared', 'CV comparé'),
+        ('interview_saved', 'Interview sauvegardé'),
+        ('questions_generated', 'Questions générées'),
+        ('answers_submitted', 'Réponses soumises'),
+        ('evaluated', 'Évalué'),
+    )
 
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste auquel l'utilisateur postule")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur qui postule")
-    application_date = models.DateTimeField(auto_now_add=True, help_text="Date de la demande (automatique)")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente', help_text="Statut de la candidature")
-    cv = models.ForeignKey(PDFDocument, on_delete=models.SET_NULL, null=True, blank=True, help_text="CV utilisé pour la candidature")
-    interview = models.ForeignKey(InterviewResponse, on_delete=models.SET_NULL, null=True, blank=True, help_text="Entretien lié à la candidature")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    application_date = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
+    cv = models.ForeignKey(PDFDocument, on_delete=models.SET_NULL, null=True, blank=True)
+    interview = models.ForeignKey('Interview', on_delete=models.SET_NULL, null=True, blank=True)
+    step = models.CharField(max_length=20, choices=INTERVIEW_STEPS, default='pending')  # Nouveau champ pour suivre l'étape
 
     def __str__(self):
         return f"{self.user.email} - {self.post.title} ({self.status})"
     
 
+    
 class Report(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste signalé")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur qui signale")

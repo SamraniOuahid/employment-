@@ -1,11 +1,10 @@
 
 
----
 
-```markdown
+
 # Employment Platform
 
-Bienvenue dans **Employment Platform**, une application backend développée avec Django et Django REST Framework pour automatiser le processus de recrutement. Ce projet permet aux employeurs vérifiés de publier des offres d’emploi approuvées par un admin, aux employés de postuler avec leurs CVs, et utilise l’intelligence artificielle pour comparer les CVs aux postes, générer des questions d’entretien, et évaluer les réponses textuelles.
+Bienvenue dans **Employment Platform**, une application backend développée avec Django et Django REST Framework pour automatiser le processus de recrutement. Ce projet permet aux employeurs vérifiés de publier des offres d’emploi approuvées par un admin, aux employés de postuler avec leurs CVs, et utilise l’intelligence artificielle pour comparer les CVs aux postes, générer des questions d’entretien, et évaluer les réponses textuelles. Les étapes du processus de candidature sont strictement ordonnées pour garantir une progression logique.
 
 ## Fonctionnalités
 - **Gestion des utilisateurs** :
@@ -19,11 +18,12 @@ Bienvenue dans **Employment Platform**, une application backend développée ave
 - **Upload de CVs** : Téléversement de fichiers PDF pour candidatures et analyse.
 - **Candidatures** :
   - Suivi avec statut (`en_attente`, `accepte`, `refuse`), CV et entretien associés.
+  - Étapes strictes : Comparaison CV/Poste → Sauvegarde Interview → Génération Questions → Soumission Réponses → Évaluation.
   - Détails des entretiens (`question`, `answer`, `score`) inclus pour les employeurs.
-- **Comparaison CV/Poste** : Évaluation de compatibilité via TF-IDF et similarité cosinus.
+- **Comparaison CV/Poste** : Évaluation de compatibilité via TF-IDF et similarité cosinus (première étape obligatoire).
 - **Entretiens virtuels** :
-  - Génération de questions avec Google Flan-T5.
-  - Évaluation des réponses avec Sentence Transformers (`all-MiniLM-L6-v2`).
+  - Génération de questions avec Google Flan-T5 (uniquement après sauvegarde de l’interview).
+  - Soumission et évaluation des réponses avec Sentence Transformers (`all-MiniLM-L6-v2`) dans un ordre strict.
 - **Dashboards personnalisés** :
   - **Admin** : Statistiques globales, liste des utilisateurs, signalements.
   - **Employé** : Historique des entretiens et candidatures.
@@ -36,7 +36,7 @@ Bienvenue dans **Employment Platform**, une application backend développée ave
 - Django REST Framework 3.15.2
 - SimpleJWT (authentification JWT)
 - Bibliothèques IA : `scikit-learn`, `transformers`, `sentence-transformers`, `PyPDF2`
-- Postman (pour tester les endpoints)
+- Apidog (pour tester les endpoints)
 
 ### Installation
 1. Clonez le dépôt :
@@ -103,14 +103,13 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
          "last_name": "Doe",
          "email": "john@example.com",
          "password": "pass1234",
-         "role": "employer",
-         "company_name": "Tech Corp"
+         "role": "employee"
      }
      ```
    - **Réponse** :
      ```json
      {
-         "detail": "Your account has been registered successfully!"
+         "detail": "Votre compte a été enregistré avec succès !"
      }
      ```
 
@@ -138,9 +137,8 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
          "first_name": "John",
          "last_name": "Doe",
          "email": "john@example.com",
-         "role": "employer",
-         "verified": false,
-         "company_name": "Tech Corp"
+         "role": "employee",
+         "verified": false
      }
      ```
 
@@ -148,8 +146,7 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
    - **Body** :
      ```json
      {
-         "first_name": "Jane",
-         "company_name": "New Corp"
+         "first_name": "Jane"
      }
      ```
    - **Réponse** : [Détails mis à jour]
@@ -164,22 +161,17 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
            "user_id": "2"
        }
        ```
-     - **Réponse** : `{"message": "Utilisateur test@example.com supprimé par l'admin"}`
 
 6. **POST /api/verify-user/<user_id>/** - Vérifier un employeur **[Auth, Admin]**
-   - **Description** : Définit `verified=True` pour un employeur.
    - **Réponse** :
      ```json
      {
          "message": "L'utilisateur john@example.com a été vérifié avec succès",
          "user": {
              "id": 2,
-             "first_name": "John",
-             "last_name": "Doe",
              "email": "john@example.com",
              "role": "employer",
-             "verified": true,
-             "company_name": "Tech Corp"
+             "verified": true
          }
      }
      ```
@@ -194,38 +186,8 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
          "description": "Recherche un développeur Python."
      }
      ```
-   - **Réponse** :
-     ```json
-     {
-         "post": {
-             "id": 1,
-             "title": "Développeur Python",
-             "description": "Recherche un développeur Python.",
-             "final_date": null,
-             "salaire": null,
-             "uploaded_at": "2025-04-08T12:00:00Z",
-             "accepted": false,
-             "approved": false,
-             "user": {
-                 "id": 2,
-                 "email": "john@example.com",
-                 "role": "employer",
-                 "company_name": "Tech Corp",
-                 "company_address": null,
-                 "company_website": null
-             }
-         }
-     }
-     ```
-   - **Erreur** (non vérifié) :
-     ```json
-     {
-         "error": "Votre compte doit être vérifié par un admin pour créer des postes"
-     }
-     ```
 
 8. **GET /post/getAll/** - Lister les postes approuvés
-   - **Description** : Retourne uniquement les postes avec `approved=True`.
    - **Réponse** :
      ```json
      {
@@ -234,261 +196,187 @@ Les endpoints marqués **[Auth]** nécessitent un token JWT dans l’en-tête `A
                  "id": 1,
                  "title": "Développeur Python",
                  "description": "Recherche un développeur Python.",
-                 "final_date": null,
-                 "salaire": null,
-                 "uploaded_at": "2025-04-08T12:00:00Z",
-                 "accepted": false,
-                 "approved": true,
-                 "user": {
-                     "id": 2,
-                     "email": "john@example.com",
-                     "role": "employer",
-                     "company_name": "Tech Corp",
-                     "company_address": "123 Tech St",
-                     "company_website": "https://techcorp.com"
-                 }
+                 "approved": true
              }
          ]
      }
      ```
 
-9. **GET /post/get/<id>/** - Récupérer un poste
-   - **Exemple** : `GET /post/get/1/`
-   - **Réponse** : [Détails du poste]
+### Processus de Candidature (Ordre Strict)
+Les endpoints suivants doivent être appelés dans cet ordre précis avec Apidog. Chaque étape nécessite la réussite de l’étape précédente, contrôlée par le champ `step` dans `PostApplication`.
 
-10. **PUT /post/update/<id>/** - Mettre à jour un poste **[Auth]**
+9. **POST /post/compare-cv-with-post/** - Comparer un CV avec un poste **[Auth]**
+   - **Description** : Première étape, crée une candidature si le score > 0.5.
+   - **Body** :
+     ```json
+     {
+         "cv_id": 1,
+         "post_id": 1
+     }
+     ```
+   - **Réponse** :
+     ```json
+     {
+         "message": "Votre CV correspond au poste. Prochaine étape : sauvegarde de l'interview.",
+         "similarity_score": 75.20,
+         "application_id": 1
+     }
+     ```
+   - **Erreur** (score < 0.5) :
+     ```json
+     {
+         "message": "Désolé, votre CV ne correspond pas au poste.",
+         "similarity_score": 45.30
+     }
+     ```
+
+10. **POST /post/save-interview/** - Sauvegarder un interview **[Auth]**
+    - **Description** : Crée un entretien lié à la candidature (nécessite `step='cv_compared'`).
     - **Body** :
       ```json
       {
-          "title": "Développeur Python Senior"
+          "application_id": 1
       }
       ```
-    - **Réponse** : [Poste mis à jour]
-
-11. **DELETE /post/delete/<id>/** - Supprimer un poste **[Auth]**
     - **Réponse** :
       ```json
       {
-          "message": "The post is deleted"
+          "message": "Interview sauvegardé. Cliquez pour commencer.",
+          "interview_id": 1
       }
       ```
-
-12. **POST /post/approve-post/<id>/** - Approuver un poste **[Auth, Admin]**
-    - **Description** : Définit `approved=True` pour un poste.
-    - **Réponse** :
+    - **Erreur** :
       ```json
       {
-          "message": "Le poste 'Développeur Python' a été approuvé avec succès",
-          "post": {
-              "id": 1,
-              "title": "Développeur Python",
-              "approved": true,
-              "user": {
-                  "id": 2,
-                  "email": "john@example.com",
-                  "role": "employer",
-                  "company_name": "Tech Corp"
-              }
-          }
+          "error": "Vous devez d'abord passer la comparaison CV/Poste."
       }
       ```
 
-13. **POST /post/apply/** - Postuler à un poste **[Auth]**
+11. **POST /post/interview/** - Générer des questions **[Auth]**
+    - **Description** : Génère des questions (nécessite `step='interview_saved'`).
     - **Body** :
       ```json
       {
-          "post_id": "1",
-          "cv_id": "1"
+          "application_id": 1
       }
       ```
     - **Réponse** :
       ```json
       {
-          "application": {
-              "post_id": 1,
-              "user_id": 3,
-              "cv_id": 1,
-              "status": "en_attente"
-          }
-      }
-      ```
-
-14. **PATCH /post/update-application/** - Mettre à jour une candidature **[Auth]**
-    - **Body** :
-      ```json
-      {
-          "application_id": "1",
-          "status": "accepte",
-          "interview_id": "1"
-      }
-      ```
-    - **Réponse** :
-      ```json
-      {
-          "application": {
-              "id": 1,
-              "status": "accepte",
-              "interview_id": 1
-          }
-      }
-      ```
-
-15. **POST /post/report/** - Signaler un poste **[Auth]**
-    - **Body** :
-      ```json
-      {
-          "post_id": "1",
-          "description": "Salaire incorrect"
-      }
-      ```
-    - **Réponse** :
-      ```json
-      {
-          "report": {
-              "id": 1,
-              "post_id": 1,
-              "description": "Salaire incorrect"
-          }
-      }
-      ```
-
-### Gestion des CVs et entretiens
-16. **POST /post/upload/** - Uploader un CV **[Auth]**
-    - **Body (form-data)** :
-      ```
-      title: "Mon CV"
-      pdf_file: <fichier.pdf>
-      ```
-    - **Réponse** :
-      ```json
-      {
-          "id": 1,
-          "title": "Mon CV",
-          "pdf_file": "cvs/cv.pdf"
-      }
-      ```
-
-17. **POST /post/compare-cv-with-post/** - Comparer un CV avec un poste
-    - **Body** :
-      ```json
-      {
-          "cv_id": 1,
-          "post_id": 1
-      }
-      ```
-    - **Réponse** :
-      ```json
-      {
-          "similarity_score": 85.23,
-          "next_step": "interview"
-      }
-      ```
-
-18. **POST /post/interview/** - Générer des questions
-    - **Body** :
-      ```json
-      {
-          "post_id": 1
-      }
-      ```
-    - **Réponse** :
-      ```json
-      {
+          "message": "Questions générées. Soumettez vos réponses.",
           "questions": [
-              "What experience do you have with Python?"
-          ]
+              "What experience do you have with Python?",
+              "How do you handle database optimization?"
+          ],
+          "interview_id": 1
+      }
+      ```
+    - **Erreur** :
+      ```json
+      {
+          "error": "L'interview doit être sauvegardé avant de commencer."
       }
       ```
 
-19. **POST /post/submit-interview/** - Soumettre des réponses **[Auth]**
+12. **POST /post/submit-interview/** - Soumettre des réponses **[Auth]**
+    - **Description** : Enregistre les réponses (nécessite `step='questions_generated'`).
     - **Body** :
       ```json
       {
-          "post_id": 1,
+          "application_id": 1,
           "responses": [
-              {
-                  "question": "What experience do you have with Python?",
-                  "answer": "3 years"
-              }
+              "I have 3 years of experience with Python.",
+              "I optimize databases using indexing."
           ]
       }
       ```
     - **Réponse** :
       ```json
       {
-          "message": "Text responses submitted successfully."
+          "message": "Réponses soumises. Prochaine étape : évaluation."
+      }
+      ```
+    - **Erreur** :
+      ```json
+      {
+          "error": "Les questions doivent être générées avant de soumettre des réponses."
       }
       ```
 
-20. **POST /post/evaluate-responses/** - Évaluer les réponses **[Auth]**
+13. **POST /post/evaluate-responses/** - Évaluer les réponses **[Auth]**
+    - **Description** : Évalue les réponses et finalise (nécessite `step='answers_submitted'`).
     - **Body** :
       ```json
       {
-          "post_id": 1,
-          "candidate_answers": ["3 years"]
+          "application_id": 1
       }
       ```
     - **Réponse** :
       ```json
       {
-          "final_score": 85.0,
-          "scores": [85.0]
+          "message": "Évaluation terminée.",
+          "final_score": 85.50,
+          "scores": [90.20, 80.30]
+      }
+      ```
+    - **Erreur** :
+      ```json
+      {
+          "error": "Les réponses doivent être soumises avant l'évaluation."
       }
       ```
 
-21. **GET /api/interview-data/** - Données des entretiens **[Auth]**
-    - **Réponse (Employeur)** :
+14. **GET /api/dashboard-stats/** - Statistiques du tableau de bord **[Auth]**
+    - **Réponse (Employé)** :
       ```json
       {
-          "total_interviews": 1,
-          "interview_data": [
+          "interview_history": [
               {
                   "id": 1,
                   "post_title": "Développeur Python",
-                  "user_email": "employee@example.com",
                   "question": "What experience do you have with Python?",
                   "answer": "3 years",
-                  "score": 85.0
+                  "score": 90.20
+              }
+          ],
+          "applications": [
+              {
+                  "post_title": "Développeur Python",
+                  "status": "accepte",
+                  "application_date": "2025-04-09T12:00:00Z"
               }
           ]
       }
       ```
 
-22. **GET /api/dashboard-stats/** - Statistiques du tableau de bord **[Auth]**
-    - **Réponse (Employeur)** :
-      ```json
-      {
-          "my_posts": [
-              {
-                  "id": 1,
-                  "title": "Développeur Python",
-                  "salaire": "10000.00",
-                  "uploaded_at": "2025-04-08T12:00:00Z"
-              }
-          ],
-          "total_posts": 1,
-          "applications": [
-              {
-                  "id": 1,
-                  "post_title": "Développeur Python",
-                  "applicant_email": "employee@example.com",
-                  "cv_id": 1,
-                  "interview_id": 1,
-                  "application_date": "2025-04-08T12:00:00Z",
-                  "status": "accepte",
-                  "test": {
-                      "question": "What experience do you have with Python?",
-                      "answer": "3 years",
-                      "score": 85.0
-                  }
-              }
-          ],
-          "total_applications": 1,
-          "pending_applications": 0
-      }
-      ```
-    - **Réponse (Admin)** : Statistiques globales.
-    - **Réponse (Employé)** : Historique des entretiens.
+## Tester avec Apidog
+1. **Configurer Apidog** :
+   - Téléchargez Apidog (https://apidog.com/) ou utilisez la version web.
+   - Créez une nouvelle collection nommée "Employment Flow".
+   - Ajoutez un environnement avec la variable `TOKEN` (valeur obtenue via `/api/token/`).
+
+2. **Exemple de Requête dans Apidog** :
+   - **Nom** : "Compare CV with Post"
+   - **Méthode** : `POST`
+   - **URL** : `http://localhost:8000/post/compare-cv-with-post/`
+   - **Headers** :
+     ```
+     Content-Type: application/json
+     Authorization: Bearer {{TOKEN}}
+     ```
+   - **Body** :
+     ```json
+     {
+         "cv_id": 1,
+         "post_id": 1
+     }
+     ```
+   - Sauvegardez et testez avec "Send".
+
+3. **Flux Complet** :
+   - Créez une requête pour chaque endpoint dans l’ordre : `/compare-cv-with-post/`, `/save-interview/`, `/interview/`, `/submit-interview/`, `/evaluate-responses/`.
+   - Utilisez l'`application_id` retourné par la première étape dans les requêtes suivantes.
+   - Vérifiez les réponses pour confirmer la progression.
 
 ## Contribution
 1. Forkez le projet.
@@ -504,17 +392,28 @@ Ce projet est sous licence MIT.
 ---
 
 ### Changements par rapport à l’ancien `README.md`
-1. **Fonctionnalités mises à jour** :
-   - Ajout de la vérification des employeurs (`verified`) et de l’approbation des postes (`approved`).
-   - Inclusion des champs `company_name`, `company_address`, `company_website` dans les postes.
-   - Ajout du champ `test` (question, answer, score) dans les candidatures pour les employeurs.
-2. **Endpoints actualisés** :
-   - Ajout de `POST /api/verify-user/<user_id>/` et `POST /post/approve-post/<id>/`.
-   - Mise à jour de `POST /post/new/` avec la restriction `verified=True`.
-   - Mise à jour de `GET /post/getAll/` pour ne retourner que les postes approuvés.
-   - Réponses enrichies avec les nouveaux champs dans `GET /post/getAll/` et `GET /api/dashboard-stats/`.
-3. **Clarté** :
-   - Descriptions plus précises des restrictions (ex. : "Réservé aux employeurs avec `verified=True`").
-   - Exemples de réponses reflétant les modifications (ex. : `approved`, `test`).
+1. **Mise à jour des Fonctionnalités** :
+   - Ajout de l’ordre strict des étapes dans "Candidatures" avec référence au champ `step`.
+   - Suppression des endpoints redondants ou non nécessaires (ex. : `/post/apply/`) pour se concentrer sur le nouveau flux.
 
-Remplacez votre ancien `README.md` par ce nouveau contenu dans votre projet. Testez les endpoints documentés avec Postman pour vous assurer qu’ils correspondent à l’implémentation actuelle. Si vous voulez ajouter d’autres sections (ex. : exemples de configuration, notes spécifiques), dites-le-moi !
+2. **Endpoints Réorganisés** :
+   - Ajout de `/post/save-interview/` comme nouvelle étape explicite.
+   - Mise à jour des descriptions et exemples pour refléter l’ordre strict et les vérifications (ex. : "nécessite `step='cv_compared'`").
+   - Réponses mises à jour avec `application_id` et messages spécifiques.
+
+3. **Section Apidog** :
+   - Ajout d’une section dédiée à l’utilisation d’Apidog pour tester le flux.
+   - Instructions pour configurer les requêtes avec headers et body.
+
+4. **Simplification** :
+   - Suppression des endpoints non pertinents dans ce contexte (ex. : `/post/update-application/`) pour éviter la confusion.
+   - Focus sur le flux principal demandé.
+
+---
+
+### Instructions
+- Remplace ton ancien `README.md` par celui-ci dans ton projet.
+- Teste chaque endpoint avec Apidog comme décrit dans la section "Tester avec Apidog" pour valider que le flux fonctionne comme prévu.
+- Si tu veux ajouter des détails supplémentaires (ex. : captures d’écran d’Apidog, autres endpoints), fais-le-moi savoir !
+
+Ce README est maintenant aligné avec ta demande d’un flux ordonné et testé via Apidog.
