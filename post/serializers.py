@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import Post, PDFDocument
+from account.models import CustomUser
+
 class PostSerializer(serializers.ModelSerializer):
     """Serializer pour le modèle Post avec les détails de l'utilisateur."""
     user = serializers.SerializerMethodField()  # Personnaliser le champ user
