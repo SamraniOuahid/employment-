@@ -168,6 +168,7 @@ def dashboard_stats(request):
         applications = PostApplication.objects.filter(user=user)
         application_data = [
             {
+                "application_id": app.id,
                 "post_title": app.post.title,
                 "cv_id": app.cv.id if app.cv else None,
                 "interview_id": app.interview.id if app.interview else None,
