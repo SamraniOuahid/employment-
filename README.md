@@ -177,6 +177,7 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
          "average_score": 90.20,
          "applications": [
              {
+                 "id": 1,
                  "post_title": "Développeur Python",
                  "status": "accepte"
              }
