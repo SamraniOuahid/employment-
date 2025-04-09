@@ -131,7 +131,8 @@ def dashboard_stats(request):
                 "id": u.id,
                 "username": u.username,
                 "email": u.email,
-                "role": u.role
+                "role": u.role,
+                "verified": u.verified,
             } for u in CustomUser.objects.all()
         ]
 
