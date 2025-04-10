@@ -36,18 +36,18 @@ class PDFDocument(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
-class InterviewResponse(models.Model):
-    """Modèle représentant une réponse d'un candidat lors d'un entretien."""
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur ayant fourni la réponse")
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste associé à l'entretien")
-    question = models.TextField(help_text="Question posée au candidat")
-    answer = models.TextField(help_text="Réponse du candidat")
-    timestamp = models.DateTimeField(auto_now_add=True, help_text="Horodatage de la réponse")
-    # approved = models.BooleanField(default=False, help_text="Indique si la réponse est approuvée")
-    score = models.FloatField(default=0.0, help_text="Score attribué à la réponse")
+# class InterviewResponse(models.Model):
+#     """Modèle représentant une réponse d'un candidat lors d'un entretien."""
+#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur ayant fourni la réponse")
+#     post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste associé à l'entretien")
+#     question = models.TextField(help_text="Question posée au candidat")
+#     answer = models.TextField(help_text="Réponse du candidat")
+#     timestamp = models.DateTimeField(auto_now_add=True, help_text="Horodatage de la réponse")
+#     # approved = models.BooleanField(default=False, help_text="Indique si la réponse est approuvée")
+#     score = models.FloatField(default=0.0, help_text="Score attribué à la réponse")
 
-    def __str__(self):
-        return f"Response from {self.user.username} for {self.post.title}"
+#     def __str__(self):
+#         return f"Response from {self.user.username} for {self.post.title}"
 
 
 
@@ -79,7 +79,7 @@ class PostApplication(models.Model):
         return f"{self.user.email} - {self.post.title} ({self.status})"
     
 
-    
+
 class Report(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, help_text="Poste signalé")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, help_text="Utilisateur qui signale")
