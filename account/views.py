@@ -169,6 +169,7 @@ def dashboard_stats(request):
         applications = PostApplication.objects.filter(user=user)
         application_data = [
             {
+                "application_id": app.id,  
                 "post_title": app.post.title,
                 "cv_id": app.cv.id if app.cv else None,
                 "interview_id": app.interview.id if app.interview else None,
@@ -192,7 +193,8 @@ def dashboard_stats(request):
                 "id": post.id,
                 "title": post.title,
                 "salaire": str(post.salaire),
-                "uploaded_at": post.uploaded_at
+                "uploaded_at": post.uploaded_at,
+                "final_date": post.final_date,
             }
             for post in employer_posts
         ]
@@ -207,8 +209,8 @@ def dashboard_stats(request):
                 "application_date": app.application_date,
                 "status": app.status,
                 "test": {
-                    "question": app.interview.question if app.interview else None,
-                    "answer": app.interview.answer if app.interview else None,
+                    "question": app.interview.questions if app.interview else None,
+                    "answer": app.interview.responses if app.interview else None,
                     "score": app.interview.score if app.interview else None
                 } if app.interview else None  # Ajout du champ test
             }
