@@ -109,8 +109,8 @@ def dashboard_stats(request):
         total_users = CustomUser.objects.count()
         total_posts = Post.objects.count()
         total_cvs = PDFDocument.objects.count()
-        total_interview_responses = InterviewResponse.objects.count()
-        average_score = InterviewResponse.objects.aggregate(models.Avg('score'))['score__avg'] or 0.0
+        total_interview_responses = Interview.objects.count()
+        average_score = Interview.objects.aggregate(models.Avg('score'))['score__avg'] or 0.0
         average_salaire = Post.objects.aggregate(models.Avg('salaire'))['salaire__avg'] or 0.0
         total_applications = PostApplication.objects.count()
         pending_applications = PostApplication.objects.filter(status='en_attente').count()
@@ -154,15 +154,15 @@ def dashboard_stats(request):
         return Response(stats, status=status.HTTP_200_OK)
 
     elif role == 'employee':
-        interview_responses = InterviewResponse.objects.filter(user=user)
+        interview_responses = Interview.objects.filter(user=user)
         response_data = [
             {
                 "id": response.id,
                 "post_title": response.post.title if hasattr(response, 'post') else "Non lié",
-                "question": response.question,
-                "answer": response.answer,
+                "question": response.questions,
+                "answer": response.responses,
                 "score": response.score,
-                "response_date": response.timestamp
+                "final_date": response.end_date,
             }
             for response in interview_responses
         ]
@@ -171,6 +171,7 @@ def dashboard_stats(request):
             {
                 "application_id": app.id,  
                 "post_title": app.post.title,
+                "post_id": app.post.id,
                 "cv_id": app.cv.id if app.cv else None,
                 "interview_id": app.interview.id if app.interview else None,
                 "status": app.status,
@@ -205,6 +206,7 @@ def dashboard_stats(request):
                 "post_title": app.post.title,
                 "applicant_email": app.user.email,
                 "cv_id": app.cv.id if app.cv else None,
+                "post_id": app.post.id,
                 "interview_id": app.interview.id if app.interview else None,
                 "application_date": app.application_date,
                 "status": app.status,
