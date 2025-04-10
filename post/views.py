@@ -111,19 +111,47 @@ class CompareCVWithPost(APIView):
 
 # Generate interview questions
 class InterviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, *args, **kwargs):
+        # Vérification de l'authentification (redondant mais explicite)
+        if not request.user.is_authenticated:
+            return Response({"error": "Utilisateur non authentifié."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Récupération et validation de l'application_id
         application_id = request.data.get('application_id')
+        if not application_id:
+            return Response({"error": "L'application_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            application_id = int(application_id)
+        except (TypeError, ValueError):
+            return Response({"error": "L'application_id doit être un entier valide."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Récupération de la candidature
         try:
             application = PostApplication.objects.get(id=application_id, user=request.user)
             if application.step != 'interview_saved':
                 return Response({"error": "L'interview doit être sauvegardé avant de commencer."}, status=status.HTTP_400_BAD_REQUEST)
             
+            # Vérification de l'interview
             interview = application.interview
             if not interview:
                 return Response({"error": "Aucun interview associé."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Générer les questions
-            questions = generate_questions(application.post.description, num_questions=5)
+            # Vérification de la description du poste
+            if not application.post.description:
+                return Response({"error": "La description du poste est vide."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Génération des questions
+            try:
+                questions = generate_questions(application.post.description, num_questions=5)
+                if not questions:
+                    return Response({"error": "Échec de la génération des questions."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            except Exception as e:
+                return Response({"error": f"Erreur lors de la génération des questions : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Sauvegarde des questions et mise à jour
             interview.questions = questions
             interview.status = 'in_progress'
             interview.save()
@@ -137,7 +165,6 @@ class InterviewView(APIView):
             })
         except PostApplication.DoesNotExist:
             return Response({"error": "Candidature non trouvée."}, status=status.HTTP_404_NOT_FOUND)
-
 # Submit text responses for interview
 class SubmitInterviewResponse(APIView):
     def post(self, request, *args, **kwargs):
@@ -375,9 +402,12 @@ def interview_data(request):
     
 
 class SaveInterview(APIView):
+    permission_classes = [IsAuthenticated]  # Assure que seul un utilisateur authentifié peut accéder
+
     def post(self, request, *args, **kwargs):
         application_id = request.data.get('application_id')
         try:
+            # Vérifie que l'utilisateur est authentifié et récupère la candidature
             application = PostApplication.objects.get(id=application_id, user=request.user)
             if application.step != 'cv_compared':
                 return Response({"error": "Vous devez d'abord passer la comparaison CV/Poste."}, status=status.HTTP_400_BAD_REQUEST)
@@ -385,7 +415,7 @@ class SaveInterview(APIView):
             # Créer l'interview
             interview = Interview.objects.create(
                 post=application.post,
-                user=request.user,
+                user=request.user,  # Utilisateur authentifié
                 status='planned'
             )
             application.interview = interview
@@ -398,3 +428,5 @@ class SaveInterview(APIView):
             }, status=status.HTTP_201_CREATED)
         except PostApplication.DoesNotExist:
             return Response({"error": "Candidature non trouvée."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

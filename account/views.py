@@ -109,8 +109,8 @@ def dashboard_stats(request):
         total_users = CustomUser.objects.count()
         total_posts = Post.objects.count()
         total_cvs = PDFDocument.objects.count()
-        total_interview_responses = InterviewResponse.objects.count()
-        average_score = InterviewResponse.objects.aggregate(models.Avg('score'))['score__avg'] or 0.0
+        total_interview_responses = Interview.objects.count()
+        average_score = Interview.objects.aggregate(models.Avg('score'))['score__avg'] or 0.0
         average_salaire = Post.objects.aggregate(models.Avg('salaire'))['salaire__avg'] or 0.0
         total_applications = PostApplication.objects.count()
         pending_applications = PostApplication.objects.filter(status='en_attente').count()
@@ -131,7 +131,8 @@ def dashboard_stats(request):
                 "id": u.id,
                 "username": u.username,
                 "email": u.email,
-                "role": u.role
+                "role": u.role,
+                "verified": u.verified,
             } for u in CustomUser.objects.all()
         ]
 
@@ -153,23 +154,24 @@ def dashboard_stats(request):
         return Response(stats, status=status.HTTP_200_OK)
 
     elif role == 'employee':
-        interview_responses = InterviewResponse.objects.filter(user=user)
+        interview_responses = Interview.objects.filter(user=user)
         response_data = [
             {
                 "id": response.id,
                 "post_title": response.post.title if hasattr(response, 'post') else "Non lié",
-                "question": response.question,
-                "answer": response.answer,
+                "question": response.questions,
+                "answer": response.responses,
                 "score": response.score,
-                "response_date": response.timestamp
+                "final_date": response.final_date,
             }
             for response in interview_responses
         ]
         applications = PostApplication.objects.filter(user=user)
         application_data = [
             {
-                "application_id": app.id,
+                "application_id": app.id,  
                 "post_title": app.post.title,
+                "post_id": app.post.id,
                 "cv_id": app.cv.id if app.cv else None,
                 "interview_id": app.interview.id if app.interview else None,
                 "status": app.status,
@@ -192,7 +194,8 @@ def dashboard_stats(request):
                 "id": post.id,
                 "title": post.title,
                 "salaire": str(post.salaire),
-                "uploaded_at": post.uploaded_at
+                "uploaded_at": post.uploaded_at,
+                "final_date": post.final_date,
             }
             for post in employer_posts
         ]
@@ -203,12 +206,13 @@ def dashboard_stats(request):
                 "post_title": app.post.title,
                 "applicant_email": app.user.email,
                 "cv_id": app.cv.id if app.cv else None,
+                "post_id": app.post.id,
                 "interview_id": app.interview.id if app.interview else None,
                 "application_date": app.application_date,
                 "status": app.status,
                 "test": {
-                    "question": app.interview.question if app.interview else None,
-                    "answer": app.interview.answer if app.interview else None,
+                    "question": app.interview.questions if app.interview else None,
+                    "answer": app.interview.responses if app.interview else None,
                     "score": app.interview.score if app.interview else None
                 } if app.interview else None  # Ajout du champ test
             }
