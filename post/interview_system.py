@@ -2,11 +2,19 @@ from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
 
 def generate_questions(post_description, num_questions=5):
-    """Génère des questions techniques basées sur la description du poste."""
+    """Generates distinct technical questions based on the job description."""
     generator = pipeline("text2text-generation", model="google/flan-t5-base")
     questions_list = []
+    prompts = [
+        f"Generate a technical question focusing on the required skills for: {post_description}.",
+        f"Create a question about the challenges someone might face in: {post_description}.",
+        f"Write a question to assess practical experience related to: {post_description}.",
+        f"Formulate a question about the tools or technologies mentioned in: {post_description}.",
+        f"Develop a question to evaluate problem-solving abilities for: {post_description}."
+    ]
+
     for i in range(num_questions):
-        prompt = f"Generate a professional HR-style technical interview question about: {post_description}. Focus on practical skills and experience. Question number {i+1}."
+        prompt = prompts[i % len(prompts)]  # Cycle through prompts if num_questions > len(prompts)
         question = generator(
             prompt,
             num_beams=4,
@@ -21,7 +29,7 @@ def generate_questions(post_description, num_questions=5):
     return questions_list
 
 def evaluate_responses(candidate_answers, post_description, questions):
-    """Évalue les réponses du candidat en les comparant avec la description du poste et les questions."""
+    """Evaluates candidate answers by comparing them with the job description and questions."""
     total_score = 0
     scores = []
 
@@ -33,20 +41,20 @@ def evaluate_responses(candidate_answers, post_description, questions):
         try:
             answer_embedding = model.encode(candidate_answer)
             
-            # Calculate similarity to post description
+            # Calculate similarity to job description
             description_similarity = util.cos_sim(answer_embedding, post_embedding).item()
             
             # Calculate similarity to the specific question
             question_similarity = util.cos_sim(answer_embedding, question_embeddings[i]).item()
             
             # Combine the scores (you can adjust the weights)
-            combined_similarity = (0.3 * description_similarity + 0.7 * question_similarity)  # 40% description, 60% question
+            combined_similarity = (0.3 * description_similarity + 0.7 * question_similarity)  # 30% description, 70% question
             
             score = round(combined_similarity * 100, 2)
             scores.append(score)
             total_score += score
         except Exception as e:
-            print(f"Erreur lors de l'évaluation de la réponse {i + 1}: {e}")
+            print(f"Error while evaluating answer {i + 1}: {e}")
             scores.append(0)
 
     final_score = round(total_score / len(candidate_answers), 2) if candidate_answers else 0

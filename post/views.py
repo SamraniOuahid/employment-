@@ -56,7 +56,7 @@ def update_post(request, pk):
 @permission_classes([IsAuthenticated])
 def delete_post(request, pk):
     post = get_object_or_404(Post, id=pk)
-    # Autoriser le créateur OU un admin (superutilisateur)
+    # Allow the creator OR an admin (superuser)
     if post.user != request.user and not request.user.is_superuser:
         return Response({"error": "Sorry, you cannot delete this post"}, status=status.HTTP_403_FORBIDDEN)
     post.delete()
@@ -81,12 +81,12 @@ class CompareCVWithPost(APIView):
             pdf_document = PDFDocument.objects.get(id=cv_id)
             post = Post.objects.get(id=post_id)
         except (PDFDocument.DoesNotExist, Post.DoesNotExist):
-            return Response({"error": "CV ou poste non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "CV or post not found."}, status=status.HTTP_404_NOT_FOUND)
 
         cv_text = extract_text_from_pdf(pdf_document.pdf_file.path)
         similarity_score = compare_cv_with_post(cv_text, post.description)
 
-        # Vérifier si une candidature existe déjà
+        # Check if an application already exists
         application, created = PostApplication.objects.get_or_create(
             post=post, user=request.user, cv=pdf_document,
             defaults={'step': 'cv_compared'}
@@ -96,7 +96,7 @@ class CompareCVWithPost(APIView):
             application.step = 'cv_compared'
             application.save()
             return Response({
-                "message": "Votre CV correspond au poste. Prochaine étape : sauvegarde de l'interview.",
+                "message": "Your CV matches the post. Next step: save the interview.",
                 "similarity_score": round(similarity_score * 100, 2),
                 "application_id": application.id
             })
@@ -104,7 +104,7 @@ class CompareCVWithPost(APIView):
             application.status = 'refuse'
             application.save()
             return Response({
-                "message": "Désolé, votre CV ne correspond pas au poste.",
+                "message": "Sorry, your CV does not match the post.",
                 "similarity_score": round(similarity_score * 100, 2)
             })
         
@@ -114,44 +114,44 @@ class InterviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        # Vérification de l'authentification (redondant mais explicite)
+        # Authentication check (redundant but explicit)
         if not request.user.is_authenticated:
-            return Response({"error": "Utilisateur non authentifié."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "User not authenticated."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Récupération et validation de l'application_id
+        # Retrieve and validate application_id
         application_id = request.data.get('application_id')
         if not application_id:
-            return Response({"error": "L'application_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "The application_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             application_id = int(application_id)
         except (TypeError, ValueError):
-            return Response({"error": "L'application_id doit être un entier valide."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "The application_id must be a valid integer."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Récupération de la candidature
+        # Retrieve the application
         try:
             application = PostApplication.objects.get(id=application_id, user=request.user)
             if application.step != 'interview_saved':
-                return Response({"error": "L'interview doit être sauvegardé avant de commencer."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "The interview must be saved before starting."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Vérification de l'interview
+            # Check the interview
             interview = application.interview
             if not interview:
-                return Response({"error": "Aucun interview associé."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "No interview associated."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Vérification de la description du poste
+            # Check the post description
             if not application.post.description:
-                return Response({"error": "La description du poste est vide."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "The post description is empty."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Génération des questions
+            # Generate questions
             try:
                 questions = generate_questions(application.post.description, num_questions=5)
                 if not questions:
-                    return Response({"error": "Échec de la génération des questions."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response({"error": "Failed to generate questions."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             except Exception as e:
-                return Response({"error": f"Erreur lors de la génération des questions : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({"error": f"Error generating questions: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # Sauvegarde des questions et mise à jour
+            # Save questions and update
             interview.questions = questions
             interview.status = 'in_progress'
             interview.save()
@@ -159,38 +159,39 @@ class InterviewView(APIView):
             application.save()
 
             return Response({
-                "message": "Questions générées. Soumettez vos réponses.",
+                "message": "Questions generated. Submit your answers.",
                 "questions": questions,
                 "interview_id": interview.id
             })
         except PostApplication.DoesNotExist:
-            return Response({"error": "Candidature non trouvée."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Application not found."}, status=status.HTTP_404_NOT_FOUND)
+
 # Submit text responses for interview
 class SubmitInterviewResponse(APIView):
     def post(self, request, *args, **kwargs):
         application_id = request.data.get('application_id')
-        responses = request.data.get('responses')  # Liste des réponses
+        responses = request.data.get('responses')  # List of responses
 
         try:
             application = PostApplication.objects.get(id=application_id, user=request.user)
             if application.step != 'questions_generated':
-                return Response({"error": "Les questions doivent être générées avant de soumettre des réponses."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Questions must be generated before submitting answers."}, status=status.HTTP_400_BAD_REQUEST)
             
             interview = application.interview
             if not interview or not interview.questions:
-                return Response({"error": "Aucune question trouvée pour cet interview."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "No questions found for this interview."}, status=status.HTTP_400_BAD_REQUEST)
 
             if len(responses) != len(interview.questions):
-                return Response({"error": "Le nombre de réponses doit correspondre au nombre de questions."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "The number of responses must match the number of questions."}, status=status.HTTP_400_BAD_REQUEST)
 
             interview.responses = responses
             interview.save()
             application.step = 'answers_submitted'
             application.save()
 
-            return Response({"message": "Réponses soumises. Prochaine étape : évaluation."})
+            return Response({"message": "Answers submitted. Next step: evaluation."})
         except PostApplication.DoesNotExist:
-            return Response({"error": "Candidature non trouvée."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Application not found."}, status=status.HTTP_404_NOT_FOUND)
         
 
     
@@ -201,13 +202,13 @@ class EvaluateTextResponsesAPIView(APIView):
         try:
             application = PostApplication.objects.get(id=application_id, user=request.user)
             if application.step != 'answers_submitted':
-                return Response({"error": "Les réponses doivent être soumises avant l'évaluation."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Answers must be submitted before evaluation."}, status=status.HTTP_400_BAD_REQUEST)
             
             interview = application.interview
             if not interview.responses:
-                return Response({"error": "Aucune réponse trouvée pour cet interview."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "No responses found for this interview."}, status=status.HTTP_400_BAD_REQUEST)
 
-            final_score, scores = evaluate_responses(interview.responses, application.post.description)
+            final_score, scores = evaluate_responses(interview.responses, application.post.description, interview.questions)
             interview.score = final_score
             interview.status = 'completed'
             interview.save()
@@ -216,12 +217,12 @@ class EvaluateTextResponsesAPIView(APIView):
             application.save()
 
             return Response({
-                "message": "Évaluation terminée.",
+                "message": "Evaluation completed.",
                 "final_score": final_score,
                 "scores": scores
             })
         except PostApplication.DoesNotExist:
-            return Response({"error": "Candidature non trouvée."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Application not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
 
@@ -230,17 +231,17 @@ class EvaluateTextResponsesAPIView(APIView):
 @permission_classes([IsAuthenticated])
 def apply_to_post(request):
     post_id = request.data.get('post_id')
-    cv_id = request.data.get('cv_id')  # Nouveau champ
+    cv_id = request.data.get('cv_id')  # New field
 
     try:
         post = Post.objects.get(id=post_id)
         cv = PDFDocument.objects.get(id=cv_id, user=request.user) if cv_id else None
 
-        # Vérifier si l'utilisateur a déjà postulé
+        # Check if the user has already applied
         if PostApplication.objects.filter(post=post, user=request.user).exists():
-            return Response({"error": "Vous avez déjà postulé à ce poste"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "You have already applied for this post"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Créer une candidature
+        # Create an application
         application = PostApplication.objects.create(
             post=post,
             user=request.user,
@@ -256,21 +257,21 @@ def apply_to_post(request):
             }
         }, status=status.HTTP_201_CREATED)
     except Post.DoesNotExist:
-        return Response({"error": "Poste non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND)
     except PDFDocument.DoesNotExist:
-        return Response({"error": "CV non trouvé ou non autorisé"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "CV not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def update_application_status(request):
     application_id = request.data.get('application_id')
     new_status = request.data.get('status')
-    interview_id = request.data.get('interview_id')  # Nouveau champ
+    interview_id = request.data.get('interview_id')  # New field
 
     try:
         application = PostApplication.objects.get(id=application_id, post__user=request.user)
         if new_status not in ['accepte', 'refuse', 'en_attente']:
-            return Response({"error": "Statut invalide"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
 
         application.status = new_status
         if interview_id:
@@ -278,7 +279,7 @@ def update_application_status(request):
                 interview = InterviewResponse.objects.get(id=interview_id, user=application.user)
                 application.interview = interview
             except InterviewResponse.DoesNotExist:
-                return Response({"error": "Entretien non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "Interview not found."}, status=status.HTTP_404_NOT_FOUND)
 
         application.save()
         return Response({
@@ -292,9 +293,8 @@ def update_application_status(request):
             }
         }, status=status.HTTP_200_OK)
     except PostApplication.DoesNotExist:
-        return Response({"error": "Candidature non trouvée ou non autorisée"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Application not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
     
-
 
 
 
@@ -307,13 +307,13 @@ def report_post(request):
     description = request.data.get('description')
 
     if not description:
-        return Response({"error": "Une description du problème est requise"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "A description of the issue is required."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         post = Post.objects.get(id=post_id)
-        # Vérifier si l'utilisateur a déjà signalé ce poste
+        # Check if the user has already reported this post
         if Report.objects.filter(post=post, user=request.user).exists():
-            return Response({"error": "Vous avez déjà signalé ce poste"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "You have already reported this post"}, status=status.HTTP_400_BAD_REQUEST)
 
         report = Report.objects.create(
             post=post,
@@ -330,7 +330,7 @@ def report_post(request):
             }
         }, status=status.HTTP_201_CREATED)
     except Post.DoesNotExist:
-        return Response({"error": "Poste non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND)
     
 
 
@@ -342,7 +342,7 @@ def interview_data(request):
     user = request.user
 
     if user.is_superuser:  # Admin
-        # Récupérer toutes les données d’entretien
+        # Retrieve all interview data
         interviews = InterviewResponse.objects.all()
         interview_data = [
             {
@@ -360,8 +360,8 @@ def interview_data(request):
             "interview_data": interview_data
         }, status=status.HTTP_200_OK)
 
-    elif user.role == 'employee':  # Employé
-        # Récupérer uniquement les entretiens de l’utilisateur connecté
+    elif user.role == 'employee':  # Employee
+        # Retrieve only interviews of the logged-in user
         interviews = InterviewResponse.objects.filter(user=user)
         interview_data = [
             {
@@ -378,8 +378,8 @@ def interview_data(request):
             "interview_data": interview_data
         }, status=status.HTTP_200_OK)
 
-    elif user.role == 'employer':  # Employeur
-        # Récupérer les entretiens liés aux postes créés par l’employeur
+    elif user.role == 'employer':  # Employer
+        # Retrieve interviews related to posts created by the employer
         interviews = InterviewResponse.objects.filter(post__user=user)
         interview_data = [
             {
@@ -398,24 +398,24 @@ def interview_data(request):
         }, status=status.HTTP_200_OK)
 
     else:
-        return Response({"error": "Rôle non reconnu"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Unrecognized role."}, status=status.HTTP_400_BAD_REQUEST)
     
 
 class SaveInterview(APIView):
-    permission_classes = [IsAuthenticated]  # Assure que seul un utilisateur authentifié peut accéder
+    permission_classes = [IsAuthenticated]  # Ensures that only authenticated users can access
 
     def post(self, request, *args, **kwargs):
         application_id = request.data.get('application_id')
         try:
-            # Vérifie que l'utilisateur est authentifié et récupère la candidature
+            # Verify that the user is authenticated and retrieve the application
             application = PostApplication.objects.get(id=application_id, user=request.user)
             if application.step != 'cv_compared':
-                return Response({"error": "Vous devez d'abord passer la comparaison CV/Poste."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "You must first pass the CV/Post comparison."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Créer l'interview
+            # Create the interview
             interview = Interview.objects.create(
                 post=application.post,
-                user=request.user,  # Utilisateur authentifié
+                user=request.user,  # Authenticated user
                 status='planned'
             )
             application.interview = interview
@@ -423,10 +423,10 @@ class SaveInterview(APIView):
             application.save()
 
             return Response({
-                "message": "Interview sauvegardé. Cliquez pour commencer.",
+                "message": "Interview saved. Click to start.",
                 "interview_id": interview.id
             }, status=status.HTTP_201_CREATED)
         except PostApplication.DoesNotExist:
-            return Response({"error": "Candidature non trouvée."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Application not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
