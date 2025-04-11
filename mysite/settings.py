@@ -143,11 +143,17 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (    
+    'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
 }
 
+SIMPLE_JWT = {
+    'TOKEN_OBTAIN_SERIALIZER': 'account.serializers.CustomTokenObtainPairSerializer',
+}
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=15),  # Le token expire après 15 minutes
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),  # Refresh token valide 1 jour
@@ -161,3 +167,9 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 AUTH_USER_MODEL = 'account.CustomUser'
+
+
+AUTHENTICATION_BACKENDS = [
+    'account.authentication.EmailBackend',  # Chemin vers ton backend
+    'django.contrib.auth.backends.ModelBackend',  # Garde le backend par défaut en secours
+]

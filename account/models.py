@@ -4,20 +4,16 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 class CustomUser(AbstractUser):
-    """Modèle personnalisé pour les utilisateurs."""
-    ROLE_CHOICES = [
-        ('employee', 'Employee'),
-        ('employer', 'Employer'),
-        ('admin', 'Admin'),
-    ]
+    username = models.CharField(max_length=150, blank=True, null=True)  # Rendre username facultatif
+    email = models.EmailField(unique=True)  # Email unique et obligatoire
+    role = models.CharField(max_length=20, choices=[('employee', 'Employee'), ('employer', 'Employer'), ('admin', 'Admin')], default='employee')
+    verified = models.BooleanField(default=False)
+    company_name = models.CharField(max_length=255, blank=True, null=True)
+    company_address = models.CharField(max_length=255, blank=True, null=True)
+    company_website = models.URLField(blank=True, null=True)
 
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee', help_text="Role of the user")
-    verified = models.BooleanField(default=False, help_text="Indicates if the user is verified")
-
-    # Champs spécifiques aux employeurs
-    company_name = models.CharField(max_length=255, blank=True, null=True, help_text="Company name (for employers)")
-    company_address = models.CharField(max_length=255, blank=True, null=True, help_text="Company address (for employers)")
-    company_website = models.URLField(blank=True, null=True, help_text="Company website (for employers)")
+    USERNAME_FIELD = 'email'  # Définit email comme champ d'identification
+    REQUIRED_FIELDS = ['first_name', 'last_name']  # Champs requis lors de la création via createsuperuser
 
     def __str__(self):
-        return self.username
+        return self.email
