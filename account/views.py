@@ -214,7 +214,7 @@ def dashboard_stats(request):
                     "question": app.interview.questions if app.interview else None,
                     "answer": app.interview.responses if app.interview else None,
                     "score": app.interview.score if app.interview else None
-                } if app.interview else None  # Ajout du champ test
+                } if app.interview else None 
             }
             for app in applications
         ]
