@@ -2,15 +2,24 @@ from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
 
 def generate_questions(post_description, num_questions=5):
-    """Generates distinct technical questions based on the job description."""
+    """
+    Generates distinct technical and HR-related questions based on the job description.
+
+    Parameters:
+        post_description (str): The text content of the job description.
+        num_questions (int): The number of questions to generate (default is 5).
+
+    Returns:
+        list: A list of generated questions as strings.
+    """
     generator = pipeline("text2text-generation", model="google/flan-t5-base")
     questions_list = []
     prompts = [
-        f"Generate a technical question focusing on the required skills for: {post_description}.",
-        f"Create a question about the challenges someone might face in: {post_description}.",
-        f"Write a question to assess practical experience related to: {post_description}.",
-        f"Formulate a question about the tools or technologies mentioned in: {post_description}.",
-        f"Develop a question to evaluate problem-solving abilities for: {post_description}."
+        f"Generate a question about the key skills required for excelling in the role described as: {post_description}.",
+        f"Generate a question about a challenging scenario one might face in the role of: {post_description}.",
+        f"Generate a question about the practical experiences most relevant to succeed in the position of: {post_description}.",
+        f"Generate a question about what makes someone a good fit for the role of: {post_description}.",
+        f"Generate a question about how to define success in the role of: {post_description}."
     ]
 
     for i in range(num_questions):
