@@ -162,11 +162,7 @@ def dashboard_stats(request):
                 "question": response.questions,
                 "answer": response.responses,
                 "score": response.score,
-<<<<<<< HEAD
                 "final_date": response.end_date,
-=======
-                "final_date": response.final_date,
->>>>>>> 957f1faed19ebff71e796eea41dff5dcdcc84cea
             }
             for response in interview_responses
         ]
