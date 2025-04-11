@@ -4,29 +4,30 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.hashers import make_password
-from django.db import models  # Ajoutez cette ligne pour Avg
+from django.db import models  # Add this line for Avg
 from .models import CustomUser
 from post.models import *
 from .serializers import SignUpSerializer, UserSerializer
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def register(request):
-    """Inscription d'un nouvel utilisateur."""
+    """Register a new user."""
     data = request.data
     serializer = SignUpSerializer(data=data)
 
     if serializer.is_valid():
-        # Vérifier si l'username ou l'email est déjà utilisé
+        # Check if the username or email is already in use
         if CustomUser.objects.filter(username=data['username']).exists():
-            return Response({'detail': 'Ce nom d’utilisateur est déjà pris !'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'This username is already taken!'}, status=status.HTTP_400_BAD_REQUEST)
         if CustomUser.objects.filter(email=data['email']).exists():
-            return Response({'detail': 'Cet email est déjà utilisé !'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'This email is already in use!'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Créer un nouvel utilisateur via le sérializer
+        # Create a new user via the serializer
         user = serializer.save()
-        return Response({'detail': 'Votre compte a été enregistré avec succès !'}, status=status.HTTP_201_CREATED)
+        return Response({'detail': 'Your account has been successfully registered!'}, status=status.HTTP_201_CREATED)
     else:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -34,37 +35,36 @@ def register(request):
 @permission_classes([IsAuthenticated])
 def delete_user(request):
     user = request.user
-    user_id = request.data.get('user_id')  # ID de l'utilisateur à supprimer (optionnel)
+    user_id = request.data.get('user_id')  # ID of the user to delete (optional)
 
     try:
         if user.role == 'admin' and user_id:
-            # Admin supprime un autre utilisateur
+            # Admin deletes another user
             target_user = CustomUser.objects.get(id=user_id)
             if target_user == user:
-                return Response({"error": "L'admin ne peut pas se supprimer lui-même via cet endpoint"},
+                return Response({"error": "Admin cannot delete themselves via this endpoint"},
                               status=status.HTTP_403_FORBIDDEN)
             target_user.delete()
-            return Response({"message": f"Utilisateur {target_user.email} supprimé par l'admin"},
+            return Response({"message": f"User {target_user.email} deleted by admin"},
                           status=status.HTTP_204_NO_CONTENT)
         else:
-            # Utilisateur supprime son propre compte
+            # User deletes their own account
             if user_id and user_id != str(user.id):
-                return Response({"error": "Vous ne pouvez supprimer que votre propre compte"},
+                return Response({"error": "You can only delete your own account"},
                               status=status.HTTP_403_FORBIDDEN)
             user.delete()
-            return Response({"message": "Votre compte a été supprimé avec succès"},
+            return Response({"message": "Your account has been successfully deleted"},
                           status=status.HTTP_204_NO_CONTENT)
     except CustomUser.DoesNotExist:
-        return Response({"error": "Utilisateur non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def current_user(request):
-    """Récupérer les détails de l'utilisateur connecté."""
+    """Retrieve the details of the logged-in user."""
     user = request.user
     serializer = UserSerializer(user, many=False)
     return Response(serializer.data)
@@ -73,29 +73,30 @@ def current_user(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_user(request):
-    """Mettre à jour les détails de l'utilisateur connecté."""
+    """Update the details of the logged-in user."""
     user = request.user
     data = request.data
 
-    # Mettre à jour les champs de base
+    # Update basic fields
+    user.username = data.get('username', user.username) 
     user.first_name = data.get('first_name', user.first_name)
     user.last_name = data.get('last_name', user.last_name)
     user.email = data.get('email', user.email)
 
-    # Mettre à jour le mot de passe si fourni
+    # Update password if provided
     if data.get('password'):
         user.password = make_password(data['password'])
 
-    # Mettre à jour les champs spécifiques aux employeurs
+    # Update employer-specific fields
     if user.role == 'employer':
         user.company_name = data.get('company_name', user.company_name)
         user.company_address = data.get('company_address', user.company_address)
         user.company_website = data.get('company_website', user.company_website)
 
-    # Sauvegarder l'utilisateur mis à jour
+    # Save the updated user
     user.save()
 
-    # Sérialiser et retourner les données mises à jour
+    # Serialize and return the updated data
     serializer = UserSerializer(user, many=False)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -111,7 +112,7 @@ def dashboard_stats(request):
         total_cvs = PDFDocument.objects.count()
         total_interview_responses = Interview.objects.count()
         average_score = Interview.objects.aggregate(models.Avg('score'))['score__avg'] or 0.0
-        average_salaire = Post.objects.aggregate(models.Avg('salaire'))['salaire__avg'] or 0.0
+        average_salary = Post.objects.aggregate(models.Avg('salaire'))['salaire__avg'] or 0.0
         total_applications = PostApplication.objects.count()
         pending_applications = PostApplication.objects.filter(status='en_attente').count()
         accepted_applications = PostApplication.objects.filter(status='accepte').count()
@@ -138,7 +139,7 @@ def dashboard_stats(request):
 
         stats = {
             "users": {"total": total_users, "list": users_list},
-            "posts": {"total": total_posts, "average_salaire": round(average_salaire, 2)},
+            "posts": {"total": total_posts, "average_salary": round(average_salary, 2)},
             "cvs": {"total": total_cvs},
             "interview_responses": {"total": total_interview_responses, "average_score": round(average_score, 2)},
             "applications": {
@@ -158,7 +159,7 @@ def dashboard_stats(request):
         response_data = [
             {
                 "id": response.id,
-                "post_title": response.post.title if hasattr(response, 'post') else "Non lié",
+                "post_title": response.post.title if hasattr(response, 'post') else "Not linked",
                 "question": response.questions,
                 "answer": response.responses,
                 "score": response.score,
@@ -193,7 +194,7 @@ def dashboard_stats(request):
             {
                 "id": post.id,
                 "title": post.title,
-                "salaire": str(post.salaire),
+                "salary": str(post.salaire),
                 "uploaded_at": post.uploaded_at,
                 "final_date": post.final_date,
             }
@@ -228,24 +229,24 @@ def dashboard_stats(request):
         return Response(stats, status=status.HTTP_200_OK)
 
     else:
-        return Response({"error": "Rôle non reconnu"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Unrecognized role"}, status=status.HTTP_400_BAD_REQUEST)
     
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def verify_user(request, user_id):
-    """Permet à un admin de valider un utilisateur (verified=True)."""
+    """Allows an admin to verify a user (verified=True)."""
     if not request.user.is_superuser:
-        return Response({"error": "Seul un admin peut valider un utilisateur"}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"error": "Only an admin can verify a user"}, status=status.HTTP_403_FORBIDDEN)
 
     user_to_verify = get_object_or_404(CustomUser, id=user_id)
     if user_to_verify.verified:
-        return Response({"message": f"L'utilisateur {user_to_verify.email} est déjà vérifié"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": f"User {user_to_verify.email} is already verified"}, status=status.HTTP_400_BAD_REQUEST)
 
     user_to_verify.verified = True
     user_to_verify.save()
     serializer = UserSerializer(user_to_verify, many=False)
     return Response({
-        "message": f"L'utilisateur {user_to_verify.email} a été vérifié avec succès",
+        "message": f"User {user_to_verify.email} has been successfully verified",
         "user": serializer.data
     }, status=status.HTTP_200_OK)

@@ -6,13 +6,14 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import CustomUser
 
 class SignUpSerializer(serializers.ModelSerializer):
-    """Sérializer pour l'inscription des utilisateurs avec email comme identifiant principal."""
+    """Serializer for user registration with email as the primary identifier."""
+    username = serializers.CharField(required=True, allow_blank=False)  
     password = serializers.CharField(write_only=True, min_length=4)
 
     class Meta:
         model = CustomUser
         fields = (
-            'first_name', 'last_name', 'email', 'password', 'role', 'verified',
+            'username', 'first_name', 'last_name', 'email', 'password', 'role', 'verified',
             'company_name', 'company_address', 'company_website'
         )
         extra_kwargs = {
@@ -26,21 +27,21 @@ class SignUpSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        """Crée un nouvel utilisateur avec un mot de passe haché, sans username."""
+        """Creates a new user with a hashed password, using the provided username."""
         try:
             validate_password(validated_data['password'])
         except ValidationError as e:
             raise serializers.ValidationError({'password': e.messages})
 
-        # Définir is_superuser à True si role est 'admin'
+        # Set is_superuser to True if role is 'admin'
         is_superuser = validated_data['role'] == 'admin'
 
-        # Si username est requis par le modèle, générer un par défaut basé sur l'email
-        email = validated_data['email']
+        # Extract username from validated_data
+        username = validated_data.get('username')
 
         user = CustomUser.objects.create_user(
-            username=username,  # Fournir un username par défaut si nécessaire
-            email=email,
+            username=username,  # Use the username provided by the client
+            email=validated_data['email'],
             password=validated_data['password'],
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
@@ -56,19 +57,19 @@ class SignUpSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Sérializer pour représenter les utilisateurs."""
+    """Serializer to represent users."""
     class Meta:
         model = CustomUser
         fields = (
-            'id', 'first_name', 'last_name', 'email', 'role', 'verified',
+            'id', 'username', 'first_name', 'last_name', 'email', 'role', 'verified',
             'company_name', 'company_address', 'company_website'
         )
         read_only_fields = ('id', 'verified')
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Sérializer personnalisé pour obtenir un token JWT avec email."""
-    username_field = 'email'  # Redéfinit le champ d'identification comme email
+    """Custom serializer to obtain a JWT token using email."""
+    username_field = 'email'  # Redefines the identification field as email
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -80,6 +81,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 attrs['user'] = user
                 return super().validate(attrs)
             else:
-                raise serializers.ValidationError('Email ou mot de passe incorrect.')
+                raise serializers.ValidationError('Incorrect email or password.')
         else:
-            raise serializers.ValidationError('Veuillez fournir un email et un mot de passe.')
+            raise serializers.ValidationError('Please provide an email and a password.')
