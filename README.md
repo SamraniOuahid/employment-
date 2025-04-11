@@ -1,4 +1,5 @@
 
+
 # Employment Platform
 
 Bienvenue dans **Employment Platform**, une application backend développée avec Django et Django REST Framework pour automatiser le processus de recrutement. Ce projet permet aux employeurs vérifiés de publier des offres d’emploi approuvées par un admin, aux employés de postuler avec leurs CVs, et utilise l’intelligence artificielle pour comparer les CVs, générer des questions d’entretien, et évaluer les réponses. Le flux de candidature suit un ordre strict : Comparaison → Sauvegarde Interview → Génération Questions → Soumission Réponses → Évaluation.
@@ -7,7 +8,7 @@ Bienvenue dans **Employment Platform**, une application backend développée ave
 - **Gestion des utilisateurs** : Inscription, mise à jour, suppression, vérification (admin).
 - **Gestion des postes** : Création, listing, mise à jour, suppression, signalement.
 - **Candidatures** : Flux ordonné avec IA pour comparaison CV/Poste et entretiens virtuels.
-- **Dashboards** : Statistiques personnalisées par rôle (admin, employé, employeur).
+- **Dashboards** : Statistiques personnalisées par rôle (admin, employé, employeur), avec `application_id` pour les employés.
 - **Tests** : Endpoints testables avec Apidog.
 
 ## Pré-requis
@@ -65,14 +66,14 @@ Bienvenue dans **Employment Platform**, une application backend développée ave
 
 ## Tous les Endpoints de l’API
 
-Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint inclut une **explication**, une **méthode**, une **URL**, des **headers** (si nécessaire), un **body** (si applicable), et un **exemple de réponse**. Les endpoints marqués **[Auth]** nécessitent un token JWT dans `Authorization: Bearer <token>` (obtenu via `/api/token/`). Les endpoints **[Auth, Admin]** sont réservés aux superutilisateurs.
+Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint inclut une **explication**, une **méthode**, une **URL**, des **headers** (si nécessaire), un **body** (si applicable), et un **exemple de réponse**. Les endpoints marqués **[Auth]** nécessitent un token JWT dans `Authorization: Bearer <token>` (obtenu via `/api/token/` avec `email` et `password`). Les endpoints **[Auth, Admin]** sont réservés aux superutilisateurs.
 
 ---
 
 ### Module `account` - Gestion des Utilisateurs
 
 1. **POST /api/register/** - Inscription
-   - **Explication** : Crée un nouvel utilisateur avec un rôle (`employee`, `employer`, `admin`). Si `role='admin'`, l’utilisateur devient superutilisateur.
+   - **Explication** : Crée un nouvel utilisateur avec un rôle (`employee`, `employer`, `admin`). L’email est l’identifiant principal. Si `role='admin'`, l’utilisateur devient superutilisateur.
    - **Headers** : `Content-Type: application/json`
    - **Body** :
      ```json
@@ -120,13 +121,12 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
      ```
 
 3. **GET /api/current-user/** - Détails de l’utilisateur connecté **[Auth]**
-   - **Explication** : Retourne les informations de l’utilisateur authentifié.
+   - **Explication** : Retourne les informations de l’utilisateur authentifié, identifié par son email.
    - **Headers** : `Authorization: Bearer <token>`
    - **Réponse** :
      ```json
      {
          "id": 1,
-         "username": "johndoe",
          "first_name": "John",
          "last_name": "Doe",
          "email": "john@example.com",
@@ -149,7 +149,6 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
      ```json
      {
          "id": 1,
-         "username": "johndoe",
          "first_name": "Jane",
          "last_name": "Doe",
          "email": "john@example.com",
@@ -159,7 +158,7 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
      ```
 
 5. **GET /api/dashboard-stats/** - Statistiques du tableau de bord **[Auth]**
-   - **Explication** : Fournit des statistiques selon le rôle (admin : globales, employé : personnelles, employeur : ses postes).
+   - **Explication** : Fournit des statistiques selon le rôle (admin : globales, employé : personnelles avec `application_id`, employeur : ses postes).
    - **Headers** : `Authorization: Bearer <token>`
    - **Réponse (Employé)** :
      ```json
@@ -177,7 +176,7 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
          "average_score": 90.20,
          "applications": [
              {
-                 "id": 1,
+                 "application_id": 1,
                  "post_title": "Développeur Python",
                  "status": "accepte"
              }
@@ -414,7 +413,7 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
       ```
 
 17. **POST /post/save-interview/** - Sauvegarder un interview **[Auth]**
-    - **Explication** : Crée un entretien pour une candidature (nécessite `step='cv_compared'`).
+    - **Explication** : Crée un entretien pour une candidature (nécessite `step='cv_compared'`). Requiert un utilisateur authentifié via JWT.
     - **Headers** : `Authorization: Bearer <token>`, `Content-Type: application/json`
     - **Body** :
       ```json
@@ -427,6 +426,12 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
       {
           "message": "Interview sauvegardé. Cliquez pour commencer.",
           "interview_id": 1
+      }
+      ```
+    - **Erreur** (non authentifié) :
+      ```json
+      {
+          "detail": "Authentication credentials were not provided."
       }
       ```
 
@@ -509,13 +514,26 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
 1. **Configurer Apidog** :
    - Téléchargez Apidog (https://apidog.com/).
    - Créez une collection "Employment Platform".
-   - Ajoutez une variable `TOKEN` dans l’environnement (obtenue via `/api/token/`).
+   - Ajoutez une variable `TOKEN` dans l’environnement (obtenue via `/api/token/` avec `email` et `password`).
 2. **Exemple de Requête** :
-   - **Méthode** : `POST`
-   - **URL** : `http://localhost:8000/post/compare-cv-with-post/`
-   - **Headers** : `Authorization: Bearer {{TOKEN}}`, `Content-Type: application/json`
-   - **Body** : `{"cv_id": 1, "post_id": 1}`
-   - Testez et notez l’`application_id`.
+   - **Obtenir un Token** :
+     - **Méthode** : `POST`
+     - **URL** : `http://localhost:8000/api/token/`
+     - **Headers** : `Content-Type: application/json`
+     - **Body** :
+       ```json
+       {
+           "email": "john@example.com",
+           "password": "pass1234"
+       }
+       ```
+     - **Réponse** : `{"refresh": "...", "access": "..."}`
+   - **Comparer un CV avec un Poste** :
+     - **Méthode** : `POST`
+     - **URL** : `http://localhost:8000/post/compare-cv-with-post/`
+     - **Headers** : `Authorization: Bearer {{TOKEN}}`, `Content-Type: application/json`
+     - **Body** : `{"cv_id": 1, "post_id": 1}`
+     - Testez et notez l’`application_id`.
 3. **Flux Strict** : Suivez l’ordre des endpoints 16 à 20 avec l’`application_id` retourné.
 
 ## Contribution
@@ -527,30 +545,21 @@ Les endpoints sont organisés par module (`account` et `post`). Chaque endpoint 
 
 ## Licence
 Ce projet est sous licence MIT.
-```
+
 
 ---
 
-### Explications des Changements
-1. **Tous les Endpoints Inclus** :
-   - J’ai listé tous les endpoints des fichiers `urls.py` de `account` (6) et `post` (15), soit 21 au total.
-   - Chaque endpoint a une explication concise de son rôle dans le système.
+### Changements Apportés par Rapport à l’Ancien `README.md`
 
-2. **Structure Claire** :
-   - Séparation entre `account` (gestion utilisateurs) et `post` (postes et candidatures).
-   - Exemples de requêtes et réponses pour chaque endpoint.
+1. **Authentification avec Email** :
+   - Suppression de `username` dans `/api/register/` et autres endpoints où il apparaissait (ex. : `/api/current-user/`, `/api/update-user/`).
+   - Ajout d’une étape explicite pour obtenir un token avec `/api/token/` utilisant `email` et `password` dans la section "Tester avec Apidog".
+   - Descriptions mises à jour pour refléter que l’email est l’identifiant principal.
 
-3. **Focus sur le Flux Strict** :
-   - Les endpoints 16 à 20 (`compare-cv-with-post` à `evaluate-responses`) sont mis en avant comme le cœur du processus de candidature, avec des préconditions explicites (`step` requis).
+2. **Ajout de `application_id` dans `/api/dashboard-stats/`** :
+   - Dans la réponse pour le rôle `employee`, le champ `applications` inclut désormais `"application_id": 1` au lieu de simplement `"id": 1`, pour plus de clarté et cohérence avec le flux strict.
 
-4. **Compatibilité Apidog** :
-   - Instructions pour tester tous les endpoints avec Apidog, avec un exemple concret.
+3. **Autres Ajustements** :
+   - Suppression de références obsolètes à `username` dans les exemples de réponses (ex. : `/api/current-user/` ne retourne plus `username`).
+   - Ajout d’une note sur l’erreur d’authentification pour `/post/save-interview/` pour rappeler l’importance du token.
 
----
-
-### Utilisation dans ton Rapport PFE
-- **Annexe** : Colle ce README dans la section "Annexes" pour documenter ton API.
-- **Chapitre Tests** : Référence les endpoints testés avec Apidog et ajoute des captures d’écran.
-- **Conception** : Explique comment les endpoints s’intègrent dans le flux strict (ex. : `step` comme verrou).
-
-Si tu veux ajuster un endpoint ou ajouter des détails (ex. : erreurs spécifiques, paramètres optionnels), dis-le-moi !
