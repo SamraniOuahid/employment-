@@ -1,3 +1,4 @@
+<img width="1920" height="901" alt="image" src="https://github.com/user-attachments/assets/90cca1a9-cc73-4533-a412-e2a6c05a66fb" />
 
 
 # Employment Platform
